@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkAI Doctor Booking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+            line-height: 1.5;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 28rem;
+            margin: 0 auto;
+            padding: 3rem 1rem;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: #f1f5f9;
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .header p {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin: 0;
+        }
+        
+        .form-container {
+            background: #1e293b;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            border: 1px solid #334155;
+            padding: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group:last-of-type {
+            margin-bottom: 0;
+        }
+        
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #f1f5f9;
+            margin-bottom: 0.5rem;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #475569;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            background-color: #334155;
+            color: #e2e8f0;
+        }
+        
+        input::placeholder, textarea::placeholder {
+            color: #94a3b8;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        textarea {
+            resize: none;
+            min-height: 4rem;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 500;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 1.5rem;
+        }
+        
+        .submit-btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .submit-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .loading-state {
+            display: none;
+            text-align: center;
+            padding: 1rem 0;
+        }
+        
+        .loading-state.active {
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 1.25rem;
+            height: 1.25rem;
+            border: 2px solid #3b82f6;
+            border-top: 2px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .loading-text {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+        
+        .message-container {
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .message-container.active {
+            display: block;
+        }
+        
+        .message-content {
+            padding: 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        
+        .message-success {
+            background-color: #064e3b;
+            color: #a7f3d0;
+            border: 1px solid #047857;
+        }
+        
+        .message-error {
+            background-color: #7f1d1d;
+            color: #fca5a5;
+            border: 1px solid #dc2626;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @media (max-width: 640px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .form-container {
+                padding: 1.5rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>LinkAI Doctor Booking</h1>
+            <p>Schedule your appointment with our medical professionals</p>
+        </div>
+
+        <!-- Main Form Container -->
+        <div class="form-container">
+            <form id="bookingForm">
+                <!-- Patient Name -->
+                <div class="form-group">
+                    <label for="patientName">Patient Name</label>
+                    <input 
+                        type="text" 
+                        id="patientName" 
+                        name="patientName" 
+                        required 
+                        placeholder="Enter patient's full name"
+                    >
+                </div>
+
+                <!-- Email -->
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        required 
+                        placeholder="Enter email address"
+                    >
+                </div>
+
+                <!-- Phone Number -->
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input 
+                        type="tel" 
+                        id="phone" 
+                        name="phone" 
+                        required 
+                        placeholder="Enter phone number"
+                    >
+                </div>
+
+                <!-- Doctor Selection -->
+                <div class="form-group">
+                    <label for="doctor">Select Doctor</label>
+                    <select 
+                        id="doctor" 
+                        name="doctor" 
+                        required
+                    >
+                        <option value="" disabled selected>Choose a doctor</option>
+                        <option value="Dr. Adebayo Ogundimu">Dr. Adebayo Ogundimu</option>
+                        <option value="Dr. Chioma Nwosu">Dr. Chioma Nwosu</option>
+                        <option value="Dr. Ibrahim Musa">Dr. Ibrahim Musa</option>
+                        <option value="Dr. Folake Adeniyi">Dr. Folake Adeniyi</option>
+                        <option value="Dr. Emeka Okafor">Dr. Emeka Okafor</option>
+                        <option value="Dr. Aisha Abdullahi">Dr. Aisha Abdullahi</option>
+                        <option value="Dr. Olumide Babatunde">Dr. Olumide Babatunde</option>
+                        <option value="Dr. Blessing Okoro">Dr. Blessing Okoro</option>
+                    </select>
+                </div>
+
+                <!-- Date and Time Row -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input 
+                            type="date" 
+                            id="date" 
+                            name="date" 
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="time">Time</label>
+                        <input 
+                            type="time" 
+                            id="time" 
+                            name="time" 
+                            required
+                        >
+                    </div>
+                </div>
+
+                <!-- Appointment Type -->
+                <div class="form-group">
+                    <label for="appointmentType">Appointment Type</label>
+                    <select 
+                        id="appointmentType" 
+                        name="appointmentType" 
+                        required
+                    >
+                        <option value="" disabled selected>Select appointment type</option>
+                        <option value="Consultation">General Consultation</option>
+                        <option value="Follow-up">Follow-up Visit</option>
+                        <option value="Check-up">Routine Check-up</option>
+                        <option value="Emergency">Emergency Consultation</option>
+                    </select>
+                </div>
+
+                <!-- Notes -->
+                <div class="form-group">
+                    <label for="notes">Additional Notes (Optional)</label>
+                    <textarea 
+                        id="notes" 
+                        name="notes"
+                        placeholder="Any specific concerns or information the doctor should know..."
+                    ></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="submit-btn"
+                    id="submitBtn"
+                >
+                    Book Appointment
+                </button>
+            </form>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <span class="loading-text">Booking your appointment...</span>
+            </div>
+        </div>
+
+        <!-- Success/Error Messages -->
+        <div id="messageContainer" class="message-container">
+            <div id="messageContent" class="message-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('bookingForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingState = document.getElementById('loadingState');
+        const messageContainer = document.getElementById('messageContainer');
+        const messageContent = document.getElementById('messageContent');
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('date').min = today;
+
+        function showMessage(message, type) {
+            const messageContainer = document.getElementById('messageContainer');
+            const messageContent = document.getElementById('messageContent');
+            
+            messageContent.textContent = message;
+            messageContainer.classList.add('active');
+            
+            if (type === 'success') {
+                messageContent.className = 'message-content message-success';
+            } else {
+                messageContent.className = 'message-content message-error';
+            }
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                messageContainer.classList.remove('active');
+            }, 5000);
+        }
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            // Show loading state
+            form.classList.add('hidden');
+            loadingState.classList.add('active');
+            
+            // Prepare form data
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('https://hooks.zapier.com/hooks/catch/24388341/uhdbgva/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    showMessage('Appointment booked successfully! You will receive a confirmation email shortly.', 'success');
+                    form.reset();
+                } else {
+                    throw new Error('Failed to book appointment');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('There was an error booking your appointment. Please try again or contact support.', 'error');
+            } finally {
+                // Hide loading state and show form
+                loadingState.classList.remove('active');
+                form.classList.remove('hidden');
+            }
+        });
+    </script>
+
+</body>
+</html>
