@@ -190,6 +190,102 @@
             border: 1px solid #dc2626;
         }
         
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            max-width: 24rem;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+        
+        .modal-icon.success {
+            background-color: #064e3b;
+            color: #a7f3d0;
+        }
+        
+        .modal-icon.error {
+            background-color: #7f1d1d;
+            color: #fca5a5;
+        }
+        
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin: 0 0 1rem 0;
+        }
+        
+        .modal-message {
+            color: #94a3b8;
+            margin: 0 0 1.5rem 0;
+            line-height: 1.6;
+        }
+        
+        .modal-close-btn {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .modal-close-btn:hover {
+            background-color: #2563eb;
+        }
+        
+        .modal-close-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        
         .hidden {
             display: none !important;
         }
@@ -342,9 +438,14 @@
             </div>
         </div>
 
-        <!-- Success/Error Messages -->
-        <div id="messageContainer" class="message-container">
-            <div id="messageContent" class="message-content"></div>
+        <!-- Modal Overlay -->
+        <div id="modalOverlay" class="modal-overlay">
+            <div class="modal-content">
+                <div id="modalIcon" class="modal-icon"></div>
+                <h3 id="modalTitle" class="modal-title"></h3>
+                <p id="modalMessage" class="modal-message"></p>
+                <button id="modalCloseBtn" class="modal-close-btn">Close</button>
+            </div>
         </div>
     </div>
 
@@ -352,31 +453,47 @@
         const form = document.getElementById('bookingForm');
         const submitBtn = document.getElementById('submitBtn');
         const loadingState = document.getElementById('loadingState');
-        const messageContainer = document.getElementById('messageContainer');
-        const messageContent = document.getElementById('messageContent');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalIcon = document.getElementById('modalIcon');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
 
         // Set minimum date to today
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('date').min = today;
 
-        function showMessage(message, type) {
-            const messageContainer = document.getElementById('messageContainer');
-            const messageContent = document.getElementById('messageContent');
+        function showModal(title, message, type) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
             
-            messageContent.textContent = message;
-            messageContainer.classList.add('active');
+            // Set icon and styling based on type
+            modalIcon.className = `modal-icon ${type}`;
+            modalIcon.innerHTML = type === 'success' ? '✓' : '✕';
             
-            if (type === 'success') {
-                messageContent.className = 'message-content message-success';
-            } else {
-                messageContent.className = 'message-content message-error';
-            }
-
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                messageContainer.classList.remove('active');
-            }, 5000);
+            modalOverlay.classList.add('active');
         }
+
+        function hideModal() {
+            modalOverlay.classList.remove('active');
+        }
+
+        // Close modal when clicking the close button
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        // Close modal when clicking outside of it
+        modalOverlay.addEventListener('click', function(event) {
+            if (event.target === modalOverlay) {
+                hideModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && modalOverlay.classList.contains('active')) {
+                hideModal();
+            }
+        });
 
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
@@ -399,14 +516,43 @@
                 });
 
                 if (response.ok) {
-                    showMessage('Appointment booked successfully! You will receive a confirmation email shortly.', 'success');
-                    form.reset();
+                    // Parse the response from Zapier
+                    const result = await response.json();
+                    
+                    // Check if Zapier indicates a conflict exists
+                    if (result.status === 'conflict' || result.eventExists === true) {
+                        showModal(
+                            'Appointment Unavailable',
+                            `Sorry, ${data.doctor} already has an appointment scheduled for ${data.date} at ${data.time}. Please choose a different time slot.`,
+                            'error'
+                        );
+                    } else if (result.status === 'confirmed' || result.eventExists === false) {
+                        showModal(
+                            'Booking Confirmed!',
+                            `Your appointment with ${data.doctor} has been successfully booked for ${data.date} at ${data.time}. You will receive a confirmation email shortly.`,
+                            'success'
+                        );
+                        // Reset form on successful booking
+                        form.reset();
+                    } else {
+                        // Handle unexpected response format
+                        showModal(
+                            'Booking Confirmed!',
+                            'Your appointment has been successfully booked. You will receive a confirmation email shortly.',
+                            'success'
+                        );
+                        form.reset();
+                    }
                 } else {
-                    throw new Error('Failed to book appointment');
+                    throw new Error('Failed to process booking');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                showMessage('There was an error booking your appointment. Please try again or contact support.', 'error');
+                showModal(
+                    'Booking Error',
+                    'There was an error processing your appointment. Please check your internet connection and try again, or contact support if the problem persists.',
+                    'error'
+                );
             } finally {
                 // Hide loading state and show form
                 loadingState.classList.remove('active');
