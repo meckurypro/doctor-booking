@@ -163,33 +163,6 @@
             color: #94a3b8;
         }
         
-        .message-container {
-            margin-top: 1rem;
-            display: none;
-        }
-        
-        .message-container.active {
-            display: block;
-        }
-        
-        .message-content {
-            padding: 1rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-        }
-        
-        .message-success {
-            background-color: #064e3b;
-            color: #a7f3d0;
-            border: 1px solid #047857;
-        }
-        
-        .message-error {
-            background-color: #7f1d1d;
-            color: #fca5a5;
-            border: 1px solid #dc2626;
-        }
-        
         /* Modal Styles */
         .modal-overlay {
             position: fixed;
@@ -305,6 +278,17 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+
+        .fallback-notice {
+            background: #7c2d12;
+            border: 1px solid #ea580c;
+            color: #fed7aa;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            text-align: center;
+        }
         
         @media (max-width: 640px) {
             .container {
@@ -332,6 +316,11 @@
 
         <!-- Main Form Container -->
         <div class="form-container">
+            <!-- Fallback Notice (only shown if using fallback method) -->
+            <div id="fallbackNotice" class="fallback-notice hidden">
+                <strong>Notice:</strong> Direct booking is currently experiencing technical issues. Your booking will be processed via email instead.
+            </div>
+
             <form id="bookingForm">
                 <!-- Patient Name -->
                 <div class="form-group">
@@ -379,10 +368,10 @@
                     >
                         <option value="" disabled selected>Choose a doctor</option>
                         <option value="Dr. Adebayo Ogundimu">Dr. Adebayo Ogundimu</option>
-                        <option value="Dr. Chioma Nwosu">Dr. Chioma Goodness</option>
+                        <option value="Dr. Chioma Goodness">Dr. Chioma Goodness</option>
                         <option value="Dr. Ibrahim Musa">Dr. Ibrahim Musa</option>
                         <option value="Dr. Folake Adeniyi">Dr. Folake Adeniyi</option>
-                        <option value="Dr. Emeka Okafor">Dr. Emeka Madu</option>
+                        <option value="Dr. Emeka Madu">Dr. Emeka Madu</option>
                         <option value="Dr. Aisha Abdullahi">Dr. Aisha Abdullahi</option>
                         <option value="Dr. Olumide Babatunde">Dr. Olumide Babatunde</option>
                         <option value="Dr. Blessing Okoro">Dr. Blessing Okoro</option>
@@ -482,10 +471,18 @@
         const modalCloseBtn = document.getElementById('modalCloseBtn');
         const debugInfo = document.getElementById('debugInfo');
         const debugContent = document.getElementById('debugContent');
+        const fallbackNotice = document.getElementById('fallbackNotice');
 
         // Set minimum date to today
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('date').min = today;
+
+        // Configuration
+        const config = {
+            zapierUrl: 'https://hooks.zapier.com/hooks/catch/24388341/uhd4dis/',
+            proxyUrl: '/api/book-appointment', // Your Node.js proxy endpoint
+            fallbackEmail: 'dankemeckury@gmail.com'
+        };
 
         function showDebugInfo(info) {
             debugContent.textContent = JSON.stringify(info, null, 2);
@@ -524,6 +521,75 @@
             }
         });
 
+        // Try to send via proxy server first, then fallback to email
+        async function sendBookingRequest(data, method = 'proxy') {
+            if (method === 'proxy') {
+                // Try proxy server first
+                return await fetch(config.proxyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+            } else if (method === 'direct') {
+                // Try direct to Zapier (might fail due to CORS)
+                return await fetch(config.zapierUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'no-cors', // This might help bypass CORS but limits response access
+                    body: JSON.stringify(data)
+                });
+            } else if (method === 'form') {
+                // Try form submission approach
+                const formData = new URLSearchParams();
+                Object.keys(data).forEach(key => {
+                    formData.append(key, data[key]);
+                });
+
+                return await fetch(config.zapierUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+            }
+        }
+
+        // Fallback: Create a mailto link
+        function createEmailFallback(data) {
+            const subject = encodeURIComponent('New Doctor Appointment Booking');
+            const body = encodeURIComponent(`
+New appointment booking request:
+
+Patient Name: ${data.patientName}
+Email: ${data.email}
+Phone: ${data.phone}
+Doctor: ${data.doctor}
+Date: ${data.date}
+Time: ${data.time}
+Appointment Type: ${data.appointmentType}
+Additional Notes: ${data.notes || 'None'}
+
+Please confirm this appointment and send confirmation details to the patient.
+
+Submitted on: ${new Date().toLocaleString()}
+            `.trim());
+
+            const mailtoLink = `mailto:${config.fallbackEmail}?subject=${subject}&body=${body}`;
+            
+            // Show fallback notice
+            fallbackNotice.classList.remove('hidden');
+            
+            // Open email client
+            window.location.href = mailtoLink;
+            
+            return true;
+        }
+
         form.addEventListener('submit', async function(event) {
             event.preventDefault();
 
@@ -535,107 +601,122 @@
             const formData = new FormData(form);
             const data = Object.fromEntries(formData.entries());
 
-            // Show what we're sending
+            // Add timestamp
+            data.timestamp = new Date().toISOString();
+            data.submissionId = Date.now().toString();
+
             showDebugInfo({
-                url: 'https://hooks.zapier.com/hooks/catch/24388341/uhd4dis/',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                attemptingMethod: 'proxy',
                 data: data,
                 timestamp: new Date().toISOString()
             });
 
-            try {
-                // Try JSON first
-                let response = await fetch('https://hooks.zapier.com/hooks/catch/24388341/uhd4dis/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
+            let success = false;
+            let lastError = null;
 
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-                if (!response.ok) {
-                    // Try form-encoded format as fallback
-                    console.log('JSON request failed, trying form-encoded...');
+            // Try multiple methods in order of preference
+            const methods = ['proxy', 'direct', 'form'];
+            
+            for (let method of methods) {
+                try {
+                    console.log(`Trying method: ${method}`);
                     
-                    const formBody = new URLSearchParams();
-                    Object.keys(data).forEach(key => {
-                        formBody.append(key, data[key]);
-                    });
-
-                    response = await fetch('https://hooks.zapier.com/hooks/catch/24388341/uhd4dis/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: formBody
-                    });
-                }
-
-                if (response.ok) {
-                    let result;
-                    try {
-                        result = await response.json();
-                        console.log('Response data:', result);
-                    } catch (e) {
-                        result = await response.text();
-                        console.log('Response text:', result);
+                    const response = await sendBookingRequest(data, method);
+                    
+                    if (method === 'direct' && response.type === 'opaque') {
+                        // no-cors mode: we can't read the response, but assume it worked
+                        console.log('Direct method completed (no-cors)');
+                        success = true;
+                        break;
                     }
                     
-                    // Check if Zapier indicates a conflict exists
-                    if (result.status === 'conflict' || result.eventExists === true) {
-                        showModal(
-                            'Appointment Unavailable',
-                            `Sorry, ${data.doctor} already has an appointment scheduled for ${data.date} at ${data.time}. Please choose a different time slot.`,
-                            'error'
-                        );
-                    } else if (result.status === 'confirmed' || result.eventExists === false) {
-                        showModal(
-                            'Booking Confirmed!',
-                            `Your appointment with ${data.doctor} has been successfully booked for ${data.date} at ${data.time}. You will receive a confirmation email shortly.`,
-                            'success'
-                        );
-                        // Reset form on successful booking
-                        form.reset();
+                    if (response.ok) {
+                        console.log(`Method ${method} succeeded`);
+                        
+                        let result;
+                        try {
+                            result = await response.json();
+                        } catch (e) {
+                            result = await response.text();
+                        }
+                        
+                        console.log('Response:', result);
+                        
+                        // Handle different response formats
+                        if (typeof result === 'object' && result.status === 'conflict') {
+                            showModal(
+                                'Appointment Unavailable',
+                                `Sorry, ${data.doctor} already has an appointment scheduled for ${data.date} at ${data.time}. Please choose a different time slot.`,
+                                'error'
+                            );
+                        } else {
+                            showModal(
+                                'Booking Confirmed!',
+                                `Your appointment with ${data.doctor} has been successfully booked for ${data.date} at ${data.time}. You will receive a confirmation email shortly.`,
+                                'success'
+                            );
+                            form.reset();
+                        }
+                        
+                        success = true;
+                        break;
+                        
                     } else {
-                        // Handle unexpected response format
-                        showModal(
-                            'Booking Confirmed!',
-                            'Your appointment has been successfully booked. You will receive a confirmation email shortly.',
-                            'success'
-                        );
-                        form.reset();
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
-                } else {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    
+                } catch (error) {
+                    console.error(`Method ${method} failed:`, error);
+                    lastError = error;
+                    
+                    // Update debug info
+                    showDebugInfo({
+                        failedMethod: method,
+                        error: error.message,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    });
+                    
+                    continue; // Try next method
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                showModal(
-                    'Booking Error',
-                    `There was an error processing your appointment: ${error.message}. Please check your internet connection and try again, or contact support if the problem persists.`,
-                    'error'
-                );
-
-                // Update debug info with error details
-                showDebugInfo({
-                    error: error.message,
-                    errorType: error.name,
-                    timestamp: new Date().toISOString(),
-                    data: data
-                });
-            } finally {
-                // Hide loading state and show form
-                loadingState.classList.remove('active');
-                form.classList.remove('hidden');
             }
+
+            // If all methods failed, use email fallback
+            if (!success) {
+                console.log('All methods failed, using email fallback');
+                
+                try {
+                    createEmailFallback(data);
+                    
+                    showModal(
+                        'Booking Request Sent',
+                        'Your booking request has been sent via email. Our team will contact you shortly to confirm your appointment. Please check that your email client opened with the booking details.',
+                        'success'
+                    );
+                    
+                    form.reset();
+                    
+                } catch (emailError) {
+                    showModal(
+                        'Booking Error',
+                        `Unable to process your booking request. Please contact us directly at ${config.fallbackEmail} with your appointment details. Error: ${lastError?.message || 'Unknown error'}`,
+                        'error'
+                    );
+                    
+                    showDebugInfo({
+                        allMethodsFailed: true,
+                        lastError: lastError?.message,
+                        emailFallbackError: emailError.message,
+                        data: data,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+
+            // Hide loading state and show form
+            loadingState.classList.remove('active');
+            form.classList.remove('hidden');
         });
     </script>
-
 </body>
 </html>
