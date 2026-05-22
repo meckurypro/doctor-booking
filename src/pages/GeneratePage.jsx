@@ -1,5 +1,6 @@
+// src/pages/GeneratePage.jsx
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ChevronDown, Zap, Wand2 } from 'lucide-react'
 import { useGenerate } from '@/hooks/useGenerate'
@@ -8,15 +9,17 @@ import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { Loader, CreditBadge } from '@/components/ui/Modal'
+import { calculateCreditCost } from '@/lib/creditUtils'  // import from shared utility
 import toast from 'react-hot-toast'
 
-// ============================================================
-// SETTINGS SELECTOR
-// ============================================================
+// ─── Setting Chips ────────────────────────────────────────
 
 const SettingChips = ({ label, options, value, onChange }) => (
   <div className="mb-4">
-    <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+    <p
+      className="text-xs font-semibold mb-2 uppercase tracking-wide"
+      style={{ color: 'var(--text-muted)' }}
+    >
       {label}
     </p>
     <div className="flex gap-2 flex-wrap">
@@ -27,7 +30,7 @@ const SettingChips = ({ label, options, value, onChange }) => (
           className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150"
           style={{
             background: value === opt.value ? 'var(--brand)' : 'var(--bg-elevated)',
-            color: value === opt.value ? 'white' : 'var(--text-secondary)',
+            color:      value === opt.value ? 'white' : 'var(--text-secondary)',
             fontFamily: 'Syne, sans-serif',
           }}
         >
@@ -38,13 +41,21 @@ const SettingChips = ({ label, options, value, onChange }) => (
   </div>
 )
 
-// ============================================================
-// GENERATE PAGE
-// ============================================================
+// ─── Video models — only relevant for video generation types ─
+
+const VIDEO_TYPES = new Set([
+  'text_to_video',
+  'image_to_video',
+  'start_end_frame',
+  'end_frame_text',
+  'template',
+])
+
+// ─── Generate Page ────────────────────────────────────────
 
 export default function GeneratePage() {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate  = useNavigate()
+  const location  = useLocation()
   const { credits } = useAuth()
   const { generate, status, isLoading } = useGenerate()
 
@@ -56,46 +67,52 @@ export default function GeneratePage() {
     templateName,
     templateDescription,
     toolLabel,
-    minImages = 2,
-    maxImages = 2,
-    creditCost = 1.0,
+    minImages    = 2,
+    maxImages    = 2,
     creditCostPerImage,
   } = state
 
-  // Form state
-  const [prompt, setPrompt] = useState('')
-  const [startFrame, setStartFrame] = useState(null)
-  const [endFrame, setEndFrame] = useState(null)
-  const [imageFrames, setImageFrames] = useState([])
-  const [aspectRatio, setAspectRatio] = useState('9:16')
-  const [duration, setDuration] = useState('5')
-  const [model, setModel] = useState('kling_2_5')
+  // Guard: navigating directly to /generate without state is a broken state
+  if (!type) return <Navigate to="/create" replace />
+
+  // ── Derived flags ─────────────────────────────────────
+  const isTemplate      = type === 'template'
+  const isMemoryLane    = templateSlug === 'memory-lane'
+  const isHandover      = templateSlug === 'office-handover'
+  const needsStartFrame = ['image_to_video', 'start_end_frame', 'image_to_image'].includes(type) || isHandover
+  const needsEndFrame   = ['start_end_frame', 'end_frame_text'].includes(type) || isHandover
+  const needsPrompt     = !isTemplate && type !== 'start_end_frame'
+  const isVideoType     = VIDEO_TYPES.has(type)
+  // Model selector only makes sense for video generation
+  const showModelPicker = isVideoType && !isTemplate
+
+  // ── Form state ────────────────────────────────────────
+  const [prompt,       setPrompt]       = useState('')
+  const [startFrame,   setStartFrame]   = useState(null)
+  const [endFrame,     setEndFrame]     = useState(null)
+  const [imageFrames,  setImageFrames]  = useState([])
+  const [aspectRatio,  setAspectRatio]  = useState('9:16')
+  const [duration,     setDuration]     = useState('5')
+  const [model,        setModel]        = useState('kling_2_5')
   const [showSettings, setShowSettings] = useState(false)
 
-  const isTemplate = type === 'template'
-  const isMemoryLane = templateSlug === 'memory-lane'
-  const isHandover = templateSlug === 'office-handover'
-  const needsStartFrame = ['image_to_video', 'start_end_frame', 'image_to_image'].includes(type) || isHandover
-  const needsEndFrame = ['start_end_frame', 'end_frame_text'].includes(type) || isHandover
-  const needsPrompt = !isTemplate && type !== 'start_end_frame'
-  const isVideoType = type?.includes('video') || isTemplate
-
+  // ── Credit estimation ─────────────────────────────────
   const estimatedCredits = creditCostPerImage
-    ? (creditCostPerImage * Math.max(imageFrames.length, minImages))
+    ? creditCostPerImage * Math.max(imageFrames.length, minImages)
     : calculateCreditCost(
-        templateSlug ? `template_${templateSlug.replace('-', '_')}` : type,
+        isTemplate ? `template_${templateSlug?.replace(/-/g, '_')}` : type,
         { duration, imageCount: imageFrames.length || 1 }
       )
 
   const canAfford = credits >= parseFloat(estimatedCredits)
 
+  // ── Generation handler ────────────────────────────────
   const handleGenerate = async () => {
-    // Validation
-    if (needsStartFrame && !startFrame) return toast.error('Please upload the first image')
-    if (needsEndFrame && !endFrame) return toast.error('Please upload the second image')
+    if (needsStartFrame && !startFrame)                 return toast.error('Please upload the first image')
+    if (needsEndFrame && !endFrame)                     return toast.error('Please upload the second image')
     if (isMemoryLane && imageFrames.length < minImages) return toast.error(`Upload at least ${minImages} photos`)
-    if (needsPrompt && !prompt.trim()) return toast.error('Please enter a prompt')
-    if (!canAfford) return toast.error('Not enough credits. Please top up.')
+    if (needsPrompt && !prompt.trim())                  return toast.error('Please enter a prompt')
+    if (!canAfford)                                     return toast.error('Not enough credits. Please top up.')
 
     const result = await generate({
       type,
@@ -112,24 +129,33 @@ export default function GeneratePage() {
 
     if (result) {
       navigate(`/result/${result.generationId}`, {
-        state: { outputUrl: result.outputUrl, outputType: result.outputType }
+        state: { outputUrl: result.outputUrl, outputType: result.outputType },
       })
     }
   }
 
+  // ── Render ─────────────────────────────────────────────
+
   return (
     <div className="page-container min-h-dvh" style={{ background: 'var(--bg-primary)' }}>
+
       {/* Header */}
-      <div className="sticky top-0 z-40 flex items-center justify-between px-4 h-14"
-        style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
+      <div
+        className="sticky top-0 z-40 flex items-center justify-between px-4 h-14"
+        style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
+      >
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 p-2 -ml-2 rounded-xl"
           style={{ color: 'var(--text-secondary)' }}
+          aria-label="Go back"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-base font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+        <h1
+          className="text-base font-bold"
+          style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+        >
           {isTemplate ? templateName : toolLabel}
         </h1>
         <CreditBadge credits={credits} size="sm" />
@@ -153,7 +179,7 @@ export default function GeneratePage() {
                     key={s}
                     className="h-1 rounded-full transition-all duration-500"
                     style={{
-                      width: status === s ? 32 : 8,
+                      width:      status === s ? 32 : 8,
                       background: status === s ? 'var(--brand)' : 'rgba(255,255,255,0.2)',
                     }}
                   />
@@ -165,10 +191,16 @@ export default function GeneratePage() {
       </AnimatePresence>
 
       <div className="px-4 py-5 pb-32">
+
         {/* Template description */}
         {isTemplate && templateDescription && (
-          <div className="mb-5 p-4 rounded-2xl"
-            style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' }}>
+          <div
+            className="mb-5 p-4 rounded-2xl"
+            style={{
+              background: 'rgba(249,115,22,0.08)',
+              border:     '1px solid rgba(249,115,22,0.2)',
+            }}
+          >
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               {templateDescription}
             </p>
@@ -189,7 +221,9 @@ export default function GeneratePage() {
 
         {/* Start + End frame uploads */}
         {!isMemoryLane && (needsStartFrame || needsEndFrame) && (
-          <div className={`mb-5 ${needsStartFrame && needsEndFrame ? 'grid grid-cols-2 gap-3' : ''}`}>
+          <div
+            className={`mb-5 ${needsStartFrame && needsEndFrame ? 'grid grid-cols-2 gap-3' : ''}`}
+          >
             {needsStartFrame && (
               <ImageUpload
                 sublabel={needsEndFrame ? 'Start frame' : 'Upload image'}
@@ -209,9 +243,6 @@ export default function GeneratePage() {
           </div>
         )}
 
-        {/* Single image for text-to-video (no image needed) */}
-        {type === 'text_to_image' || type === 'text_to_video' ? null : null}
-
         {/* Prompt input */}
         {needsPrompt && (
           <div className="mb-5">
@@ -222,26 +253,27 @@ export default function GeneratePage() {
               placeholder="Describe what you want to create..."
               rows={3}
               maxLength={500}
-              hint={type !== 'template' ? "Claude AI will enhance your prompt automatically" : undefined}
+              hint="Claude AI will enhance your prompt automatically"
             />
-            {type !== 'template' && (
-              <div className="flex items-center gap-1.5 mt-2">
-                <Wand2 size={12} style={{ color: 'var(--brand)' }} />
-                <p className="text-xs" style={{ color: 'var(--brand)' }}>
-                  AI prompt enhancement enabled
-                </p>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 mt-2">
+              <Wand2 size={12} style={{ color: 'var(--brand)' }} />
+              <p className="text-xs" style={{ color: 'var(--brand)' }}>
+                AI prompt enhancement enabled
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Settings toggle */}
+        {/* Settings accordion */}
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="flex items-center gap-2 w-full py-3 px-4 rounded-2xl mb-2 transition-colors"
           style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
         >
-          <span className="text-sm font-semibold flex-1 text-left" style={{ fontFamily: 'Syne, sans-serif' }}>
+          <span
+            className="text-sm font-semibold flex-1 text-left"
+            style={{ fontFamily: 'Syne, sans-serif' }}
+          >
             Generation settings
           </span>
           <motion.div animate={{ rotate: showSettings ? 180 : 0 }}>
@@ -261,9 +293,9 @@ export default function GeneratePage() {
                 <SettingChips
                   label="Aspect Ratio"
                   options={[
-                    { label: '9:16 Portrait', value: '9:16' },
+                    { label: '9:16 Portrait',  value: '9:16' },
                     { label: '16:9 Landscape', value: '16:9' },
-                    { label: '1:1 Square', value: '1:1' },
+                    { label: '1:1 Square',     value: '1:1'  },
                   ]}
                   value={aspectRatio}
                   onChange={setAspectRatio}
@@ -273,8 +305,8 @@ export default function GeneratePage() {
                   <SettingChips
                     label="Duration"
                     options={[
-                      { label: '5s', value: '5' },
-                      { label: '8s', value: '8' },
+                      { label: '5s',  value: '5'  },
+                      { label: '8s',  value: '8'  },
                       { label: '10s', value: '10' },
                     ]}
                     value={duration}
@@ -282,15 +314,18 @@ export default function GeneratePage() {
                   />
                 )}
 
-                <SettingChips
-                  label="AI Model"
-                  options={[
-                    { label: 'Kling 2.5', value: 'kling_2_5' },
-                    { label: 'Seedance', value: 'seedance_1_5' },
-                  ]}
-                  value={model}
-                  onChange={setModel}
-                />
+                {/* Model picker only for video types — Kling/Seedance are video models */}
+                {showModelPicker && (
+                  <SettingChips
+                    label="AI Model"
+                    options={[
+                      { label: 'Kling 2.5', value: 'kling_2_5'     },
+                      { label: 'Seedance',  value: 'seedance_1_5'  },
+                    ]}
+                    value={model}
+                    onChange={setModel}
+                  />
+                )}
               </div>
             </motion.div>
           )}
@@ -298,8 +333,10 @@ export default function GeneratePage() {
       </div>
 
       {/* Sticky Generate Button */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 p-4 safe-bottom"
-        style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 p-4 safe-bottom"
+        style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}
+      >
         <div className="max-w-[480px] mx-auto">
           <Button
             onClick={handleGenerate}
@@ -314,7 +351,13 @@ export default function GeneratePage() {
           </Button>
           {!canAfford && (
             <p className="text-xs text-center mt-2 text-red-500">
-              Not enough credits. <button onClick={() => navigate('/profile')} className="underline font-semibold">Top up here</button>
+              Not enough credits.{' '}
+              <button
+                onClick={() => navigate('/profile')}
+                className="underline font-semibold"
+              >
+                Top up here
+              </button>
             </p>
           )}
         </div>
