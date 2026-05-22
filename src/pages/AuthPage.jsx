@@ -6,7 +6,7 @@ import { Mail, Lock, User, ArrowRight } from 'lucide-react'
 import { auth, profiles } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
-import { Input, OTPInput } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { Divider } from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
 
@@ -76,7 +76,7 @@ export default function AuthPage() {
 
     if (error) { toast.error(error.message || 'Failed to send code'); return }
 
-    toast.success('Check your email for the 6-digit code!')
+    toast.success('Check your email for the 8-digit code!')
     setView(VIEWS.OTP_VERIFY)
   }
 
@@ -85,7 +85,7 @@ export default function AuthPage() {
   // not just verify — auth.updatePassword in the next step depends on it.
   const handleVerifyOTP = async () => {
     clearErrors()
-    if (otp.length < 6) return setErrors({ otp: 'Enter the complete 6-digit code' })
+    if (otp.length < 8) return setErrors({ otp: 'Enter the complete 8-digit code' })
 
     setLoading(true)
     const { error } = await auth.verifyOTP(email, otp)
@@ -277,7 +277,7 @@ export default function AuthPage() {
                   Create account
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>
-                  We'll send a 6-digit verification code to your email
+                  We'll send an 8-digit verification code to your email
                 </p>
               </div>
               <div className="flex flex-col gap-4">
@@ -317,10 +317,21 @@ export default function AuthPage() {
                 </p>
               </div>
               <div className="flex flex-col gap-6">
-                <OTPInput value={otp} onChange={setOtp} length={6} />
-                {errors.otp && (
-                  <p className="text-sm text-red-500 text-center -mt-2">{errors.otp}</p>
-                )}
+                <Input
+                  label="Verification code"
+                  type="text"
+                  inputMode="numeric"
+                  value={otp}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 8)
+                    setOtp(val)
+                  }}
+                  placeholder="Enter 8-digit code"
+                  error={errors.otp}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  maxLength={8}
+                />
                 <Button onClick={handleVerifyOTP} loading={loading} variant="primary" size="lg" fullWidth>
                   Verify code
                 </Button>
