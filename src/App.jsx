@@ -34,7 +34,6 @@ const FullLoader = ({ size = 'md' }) => (
 )
 
 // ── OAuth Callback Handler ─────────────────────────────────
-// Lets Supabase process the session from the URL hash before redirecting.
 
 const AuthCallbackPage = () => {
   const { user, loading } = useAuth()
@@ -55,13 +54,10 @@ const ProtectedRoute = ({ children }) => {
   const { user, loading, onboardingNeeded } = useAuth()
 
   if (loading) return <FullLoader size="md" />
-
-  // Not logged in → go to auth
   if (!user) return <Navigate to="/auth" replace />
 
-  // Logged in but needs onboarding → AuthPage handles this state.
-  // Guard against redirect loop: AuthPage must NOT redirect away
-  // when user exists but onboardingNeeded is true.
+  // onboardingNeeded: AuthPage must check this flag and NOT
+  // redirect away when user exists but onboarding is incomplete.
   if (onboardingNeeded) return <Navigate to="/auth" replace />
 
   return children
@@ -72,9 +68,9 @@ const ProtectedRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const { user, isAdmin, loading } = useAuth()
 
-  if (loading)   return <FullLoader size="md" />
-  if (!user)     return <Navigate to="/auth"  replace />
-  if (!isAdmin)  return <Navigate to="/feed"  replace />
+  if (loading)  return <FullLoader size="md" />
+  if (!user)    return <Navigate to="/auth"  replace />
+  if (!isAdmin) return <Navigate to="/feed"  replace />
 
   return children
 }
@@ -106,14 +102,8 @@ const AppRoutes = () => {
         path="/auth"
         element={user ? <Navigate to="/create" replace /> : <AuthPage />}
       />
-      <Route
-        path="/auth/callback"
-        element={<AuthCallbackPage />}
-      />
-      <Route
-        path="/auth/reset-password"
-        element={<ResetPasswordPage />}
-      />
+      <Route path="/auth/callback"        element={<AuthCallbackPage />} />
+      <Route path="/auth/reset-password"  element={<ResetPasswordPage />} />
 
       {/* Protected */}
       <Route path="/feed" element={
@@ -138,7 +128,7 @@ const AppRoutes = () => {
         <ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>
       } />
 
-      {/* Admin — intentionally no AppLayout (no BottomNav on admin dashboard) */}
+      {/* Admin — no AppLayout (no BottomNav) */}
       <Route path="/admin" element={
         <AdminRoute><AdminPage /></AdminRoute>
       } />
@@ -154,32 +144,31 @@ const AppRoutes = () => {
 
 // ── Main App ───────────────────────────────────────────────
 
+const toastStyles = {
+  style: {
+    background:   'var(--bg-elevated)',
+    color:        'var(--text-primary)',
+    border:       '1px solid var(--border)',
+    borderRadius: '14px',
+    fontFamily:   'DM Sans, sans-serif',
+    fontSize:     '14px',
+    fontWeight:   500,
+    padding:      '12px 16px',
+    maxWidth:     '360px',
+  },
+  success: { iconTheme: { primary: '#f97316', secondary: 'white' } },
+  error:   { iconTheme: { primary: '#ef4444', secondary: 'white' } },
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
           <AppRoutes />
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background:   'var(--bg-elevated)',
-                color:        'var(--text-primary)',
-                border:       '1px solid var(--border)',
-                borderRadius: '14px',
-                fontFamily:   'DM Sans, sans-serif',
-                fontSize:     '14px',
-                fontWeight:   500,
-                padding:      '12px 16px',
-                maxWidth:     '360px',
-              },
-              success: { iconTheme: { primary: '#f97316', secondary: 'white' } },
-              error:   { iconTheme: { primary: '#ef4444', secondary: 'white' } },
-            }}
-          />
         </BrowserRouter>
+        {/* Toaster outside BrowserRouter — does not need router context */}
+        <Toaster position="top-center" toastOptions={{ duration: 3000, ...toastStyles }} />
       </AuthProvider>
     </ThemeProvider>
   )
