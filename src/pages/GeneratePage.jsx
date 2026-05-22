@@ -9,17 +9,14 @@ import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload'
 import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
 import { Loader, CreditBadge } from '@/components/ui/Modal'
-import { calculateCreditCost } from '@/lib/creditUtils'  // import from shared utility
+import { calculateCreditCost } from '@/lib/creditUtils'
 import toast from 'react-hot-toast'
 
 // ─── Setting Chips ────────────────────────────────────────
 
 const SettingChips = ({ label, options, value, onChange }) => (
   <div className="mb-4">
-    <p
-      className="text-xs font-semibold mb-2 uppercase tracking-wide"
-      style={{ color: 'var(--text-muted)' }}
-    >
+    <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
       {label}
     </p>
     <div className="flex gap-2 flex-wrap">
@@ -41,8 +38,6 @@ const SettingChips = ({ label, options, value, onChange }) => (
   </div>
 )
 
-// ─── Video models — only relevant for video generation types ─
-
 const VIDEO_TYPES = new Set([
   'text_to_video',
   'image_to_video',
@@ -52,11 +47,13 @@ const VIDEO_TYPES = new Set([
 ])
 
 // ─── Generate Page ────────────────────────────────────────
+// IMPORTANT: <Navigate> must be rendered AFTER all hooks.
+// We read location.state first, then run all hooks, then guard at render time.
 
 export default function GeneratePage() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const { credits } = useAuth()
+  const navigate              = useNavigate()
+  const location              = useLocation()
+  const { credits }           = useAuth()
   const { generate, status, isLoading } = useGenerate()
 
   const state = location.state || {}
@@ -72,9 +69,6 @@ export default function GeneratePage() {
     creditCostPerImage,
   } = state
 
-  // Guard: navigating directly to /generate without state is a broken state
-  if (!type) return <Navigate to="/create" replace />
-
   // ── Derived flags ─────────────────────────────────────
   const isTemplate      = type === 'template'
   const isMemoryLane    = templateSlug === 'memory-lane'
@@ -83,7 +77,6 @@ export default function GeneratePage() {
   const needsEndFrame   = ['start_end_frame', 'end_frame_text'].includes(type) || isHandover
   const needsPrompt     = !isTemplate && type !== 'start_end_frame'
   const isVideoType     = VIDEO_TYPES.has(type)
-  // Model selector only makes sense for video generation
   const showModelPicker = isVideoType && !isTemplate
 
   // ── Form state ────────────────────────────────────────
@@ -106,6 +99,10 @@ export default function GeneratePage() {
 
   const canAfford = credits >= parseFloat(estimatedCredits)
 
+  // ── Guard: must be AFTER all hooks ───────────────────
+  // Hooks above always run; Navigate renders conditionally at JSX time.
+  if (!type) return <Navigate to="/create" replace />
+
   // ── Generation handler ────────────────────────────────
   const handleGenerate = async () => {
     if (needsStartFrame && !startFrame)                 return toast.error('Please upload the first image')
@@ -115,16 +112,10 @@ export default function GeneratePage() {
     if (!canAfford)                                     return toast.error('Not enough credits. Please top up.')
 
     const result = await generate({
-      type,
-      templateId,
-      templateSlug,
-      prompt,
-      startFrame,
-      endFrame,
+      type, templateId, templateSlug,
+      prompt, startFrame, endFrame,
       imageFrames: isMemoryLane ? imageFrames : null,
-      aspectRatio,
-      duration,
-      model,
+      aspectRatio, duration, model,
     })
 
     if (result) {
@@ -133,8 +124,6 @@ export default function GeneratePage() {
       })
     }
   }
-
-  // ── Render ─────────────────────────────────────────────
 
   return (
     <div className="page-container min-h-dvh" style={{ background: 'var(--bg-primary)' }}>
@@ -152,10 +141,7 @@ export default function GeneratePage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1
-          className="text-base font-bold"
-          style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
-        >
+        <h1 className="text-base font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
           {isTemplate ? templateName : toolLabel}
         </h1>
         <CreditBadge credits={credits} size="sm" />
@@ -192,88 +178,60 @@ export default function GeneratePage() {
 
       <div className="px-4 py-5 pb-32">
 
-        {/* Template description */}
         {isTemplate && templateDescription && (
           <div
             className="mb-5 p-4 rounded-2xl"
-            style={{
-              background: 'rgba(249,115,22,0.08)',
-              border:     '1px solid rgba(249,115,22,0.2)',
-            }}
+            style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)' }}
           >
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {templateDescription}
-            </p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{templateDescription}</p>
           </div>
         )}
 
-        {/* Memory Lane — multi image upload */}
         {isMemoryLane && (
           <div className="mb-5">
-            <MultiImageUpload
-              values={imageFrames}
-              onChange={setImageFrames}
-              minImages={minImages}
-              maxImages={maxImages}
-            />
+            <MultiImageUpload values={imageFrames} onChange={setImageFrames} minImages={minImages} maxImages={maxImages} />
           </div>
         )}
 
-        {/* Start + End frame uploads */}
         {!isMemoryLane && (needsStartFrame || needsEndFrame) && (
-          <div
-            className={`mb-5 ${needsStartFrame && needsEndFrame ? 'grid grid-cols-2 gap-3' : ''}`}
-          >
+          <div className={`mb-5 ${needsStartFrame && needsEndFrame ? 'grid grid-cols-2 gap-3' : ''}`}>
             {needsStartFrame && (
               <ImageUpload
                 sublabel={needsEndFrame ? 'Start frame' : 'Upload image'}
-                value={startFrame}
-                onChange={setStartFrame}
-                onRemove={() => setStartFrame(null)}
+                value={startFrame} onChange={setStartFrame} onRemove={() => setStartFrame(null)}
               />
             )}
             {needsEndFrame && (
               <ImageUpload
                 sublabel="End frame"
-                value={endFrame}
-                onChange={setEndFrame}
-                onRemove={() => setEndFrame(null)}
+                value={endFrame} onChange={setEndFrame} onRemove={() => setEndFrame(null)}
               />
             )}
           </div>
         )}
 
-        {/* Prompt input */}
         {needsPrompt && (
           <div className="mb-5">
             <Textarea
-              label="Prompt"
-              value={prompt}
+              label="Prompt" value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe what you want to create..."
-              rows={3}
-              maxLength={500}
+              rows={3} maxLength={500}
               hint="Claude AI will enhance your prompt automatically"
             />
             <div className="flex items-center gap-1.5 mt-2">
               <Wand2 size={12} style={{ color: 'var(--brand)' }} />
-              <p className="text-xs" style={{ color: 'var(--brand)' }}>
-                AI prompt enhancement enabled
-              </p>
+              <p className="text-xs" style={{ color: 'var(--brand)' }}>AI prompt enhancement enabled</p>
             </div>
           </div>
         )}
 
-        {/* Settings accordion */}
         <button
           onClick={() => setShowSettings(!showSettings)}
           className="flex items-center gap-2 w-full py-3 px-4 rounded-2xl mb-2 transition-colors"
           style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
         >
-          <span
-            className="text-sm font-semibold flex-1 text-left"
-            style={{ fontFamily: 'Syne, sans-serif' }}
-          >
+          <span className="text-sm font-semibold flex-1 text-left" style={{ fontFamily: 'Syne, sans-serif' }}>
             Generation settings
           </span>
           <motion.div animate={{ rotate: showSettings ? 180 : 0 }}>
@@ -300,7 +258,6 @@ export default function GeneratePage() {
                   value={aspectRatio}
                   onChange={setAspectRatio}
                 />
-
                 {isVideoType && (
                   <SettingChips
                     label="Duration"
@@ -313,14 +270,12 @@ export default function GeneratePage() {
                     onChange={setDuration}
                   />
                 )}
-
-                {/* Model picker only for video types — Kling/Seedance are video models */}
                 {showModelPicker && (
                   <SettingChips
                     label="AI Model"
                     options={[
-                      { label: 'Kling 2.5', value: 'kling_2_5'     },
-                      { label: 'Seedance',  value: 'seedance_1_5'  },
+                      { label: 'Kling 2.5', value: 'kling_2_5'    },
+                      { label: 'Seedance',  value: 'seedance_1_5' },
                     ]}
                     value={model}
                     onChange={setModel}
@@ -352,10 +307,7 @@ export default function GeneratePage() {
           {!canAfford && (
             <p className="text-xs text-center mt-2 text-red-500">
               Not enough credits.{' '}
-              <button
-                onClick={() => navigate('/profile')}
-                className="underline font-semibold"
-              >
+              <button onClick={() => navigate('/profile')} className="underline font-semibold">
                 Top up here
               </button>
             </p>
