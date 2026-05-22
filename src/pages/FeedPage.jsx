@@ -1,5 +1,5 @@
 // src/pages/FeedPage.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Heart, Play, Film, Image, X } from 'lucide-react'
 import { feed as feedDb } from '@/lib/supabase'
@@ -72,7 +72,6 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
       className="rounded-3xl overflow-hidden"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
-      {/* Media */}
       <div className="relative aspect-[9/16] max-h-96 bg-black overflow-hidden">
         <img
           src={post.thumbnail_url}
@@ -80,7 +79,6 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
           className="w-full h-full object-cover"
           loading="lazy"
         />
-
         {isVideo && (
           <button
             onClick={() => onPlayVideo(post.output_url)}
@@ -95,8 +93,6 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
             </div>
           </button>
         )}
-
-        {/* Type badge */}
         <div
           className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs"
           style={{ background: 'rgba(0,0,0,0.5)', color: 'white', backdropFilter: 'blur(4px)' }}
@@ -106,7 +102,6 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
         </div>
       </div>
 
-      {/* Info row */}
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div
@@ -117,16 +112,11 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
             {post.profiles?.username?.[0]?.toUpperCase() || 'U'}
           </div>
           <div>
-            <p
-              className="text-sm font-semibold"
-              style={{ color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif' }}
-            >
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif' }}>
               @{post.profiles?.username || 'user'}
             </p>
             {post.templates?.name && (
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {post.templates.name}
-              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{post.templates.name}</p>
             )}
           </div>
         </div>
@@ -154,21 +144,16 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
 const PAGE_SIZE = 20
 
 export default function FeedPage() {
-  const { user }                          = useAuth()
-  const [posts, setPosts]                 = useState([])
-  const [loading, setLoading]             = useState(true)
-  const [likedPosts, setLikedPosts]       = useState(new Set())
-  const [page, setPage]                   = useState(0)
-  const [hasMore, setHasMore]             = useState(true)
-  const [loadingMore, setLoadingMore]     = useState(false)
-  const [activeVideo, setActiveVideo]     = useState(null)   // URL of video to play
+  const { user }                      = useAuth()
+  const [posts, setPosts]             = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [likedPosts, setLikedPosts]   = useState(new Set())
+  const [page, setPage]               = useState(0)
+  const [hasMore, setHasMore]         = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [activeVideo, setActiveVideo] = useState(null)
 
-  useEffect(() => {
-    loadPosts(0, true)
-    loadUserLikes()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadPosts = async (offset = 0, reset = false) => {
+  const loadPosts = useCallback(async (offset = 0, reset = false) => {
     if (offset === 0) setLoading(true)
     else setLoadingMore(true)
 
@@ -181,21 +166,24 @@ export default function FeedPage() {
 
     setLoading(false)
     setLoadingMore(false)
-  }
+  }, [])
 
-  const loadUserLikes = async () => {
+  const loadUserLikes = useCallback(async () => {
     if (!user) return
-    // feedDb.getUserLikes must return string[] of post IDs
     const { data } = await feedDb.getUserLikes(user.id)
     setLikedPosts(new Set(data || []))
-  }
+  }, [user])
+
+  useEffect(() => {
+    loadPosts(0, true)
+    loadUserLikes()
+  }, [loadPosts, loadUserLikes])
 
   const handleLike = async (postId) => {
     if (!user) return toast.error('Sign in to like posts')
 
     const wasLiked = likedPosts.has(postId)
 
-    // Optimistic update
     setLikedPosts((prev) => {
       const next = new Set(prev)
       wasLiked ? next.delete(postId) : next.add(postId)
@@ -212,7 +200,7 @@ export default function FeedPage() {
     const { data } = await feedDb.toggleLike(user.id, postId)
 
     if (!data?.success) {
-      // Revert both state pieces on failure
+      // Revert on failure
       setLikedPosts((prev) => {
         const next = new Set(prev)
         wasLiked ? next.add(postId) : next.delete(postId)
@@ -239,10 +227,7 @@ export default function FeedPage() {
       <TopBar showLogo showCredits />
       <PageWrapper>
         <div className="pt-2 pb-4">
-          <h1
-            className="text-2xl font-black"
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
-          >
+          <h1 className="text-2xl font-black" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
             Community
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -292,7 +277,6 @@ export default function FeedPage() {
         )}
       </PageWrapper>
 
-      {/* Video player modal */}
       {activeVideo && (
         <VideoModal url={activeVideo} onClose={() => setActiveVideo(null)} />
       )}
