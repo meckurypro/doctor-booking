@@ -1,3 +1,4 @@
+// src/hooks/useGenerate.js
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { generations as generationsDb } from '@/lib/supabase'
@@ -12,18 +13,19 @@ import {
   endFrameToVideo,
   officeHandoverTemplate,
   memoryLaneTemplate,
-  calculateCreditCost,
 } from '@/lib/fal'
+import { calculateCreditCost } from '@/lib/creditUtils'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
 export const useGenerate = () => {
   const { user, refreshProfile } = useAuth()
-  const [status, setStatus] = useState('idle') // idle | uploading | enhancing | generating | done | error
-  const [progress, setProgress] = useState(null)
-  const [result, setResult] = useState(null)
+
+  const [status,       setStatus]       = useState('idle')
+  const [progress,     setProgress]     = useState(null)
+  const [result,       setResult]       = useState(null)
   const [generationId, setGenerationId] = useState(null)
-  const [error, setError] = useState(null)
+  const [error,        setError]        = useState(null)
 
   const reset = () => {
     setStatus('idle')
@@ -33,7 +35,6 @@ export const useGenerate = () => {
     setError(null)
   }
 
-  // Get active prompt from database for templates
   const getTemplatePrompt = async (templateSlug) => {
     const { data, error } = await supabase.rpc('get_active_prompt', {
       p_template_slug: templateSlug,
@@ -43,47 +44,49 @@ export const useGenerate = () => {
   }
 
   const generate = async ({
-    type,           // generation_type
+    type,
     templateId,
     templateSlug,
     prompt,
-    startFrame,     // File object
-    endFrame,       // File object
-    imageFrames,    // Array of File objects (memory lane)
+    startFrame,
+    endFrame,
+    imageFrames,
     aspectRatio,
     duration,
     model,
     shouldEnhance = true,
   }) => {
-    if (!user) {
-      toast.error('Please sign in to generate')
-      return
-    }
+    if (!user) { toast.error('Please sign in to generate'); return null }
+
+    // Use a local var for generationId so the catch block always has
+    // the latest value — state updates are async and would be stale.
+    let localGenId = null
 
     try {
       reset()
       setStatus('uploading')
 
-      // Calculate credit cost
       const imageCount = imageFrames?.length || 1
       const creditCost = calculateCreditCost(
-        templateSlug ? `template_${templateSlug.replace('-', '_')}` : type,
+        templateSlug ? `template_${templateSlug.replace(/-/g, '_')}` : type,
         { duration, imageCount }
       )
 
-      // Create generation record
+      // Create generation record first
       const { data: genRecord, error: genError } = await generationsDb.create({
-        user_id: user.id,
-        template_id: templateId || null,
+        user_id:         user.id,
+        template_id:     templateId || null,
         generation_type: type,
-        status: 'pending',
-        model: model || 'kling_2_5',
-        aspect_ratio: aspectRatio || '9:16',
-        duration: duration || '5',
+        status:          'pending',
+        model:           model || 'kling_2_5',
+        aspect_ratio:    aspectRatio || '9:16',
+        duration:        duration    || '5',
         credits_charged: creditCost,
       })
 
       if (genError) throw new Error('Failed to create generation record')
+
+      localGenId = genRecord.id
       setGenerationId(genRecord.id)
 
       // Deduct credits
@@ -97,11 +100,13 @@ export const useGenerate = () => {
         throw new Error(deductResult?.error || 'Insufficient credits')
       }
 
-      // Refresh profile to show updated credits
+      // Refresh credits display immediately
       refreshProfile()
 
-      // Upload images
-      let startFrameUrl, endFrameUrl, imageUrls = []
+      // ── Upload images ────────────────────────────────────
+      let startFrameUrl = null
+      let endFrameUrl   = null
+      const imageUrls   = []
 
       if (startFrame) {
         const { url, error: uploadErr } = await uploadImage(startFrame)
@@ -123,17 +128,16 @@ export const useGenerate = () => {
         }
       }
 
-      // Update record with uploaded URLs
       await generationsDb.update(genRecord.id, {
-        start_frame_url: startFrameUrl,
-        end_frame_url: endFrameUrl,
-        input_image_urls: imageUrls.length > 0 ? imageUrls : null,
-        status: 'processing',
+        start_frame_url:   startFrameUrl,
+        end_frame_url:     endFrameUrl,
+        input_image_urls:  imageUrls.length > 0 ? imageUrls : null,
+        status:            'processing',
       })
 
+      // ── Prompt resolution ────────────────────────────────
       setStatus('enhancing')
 
-      // Get prompt (from DB for templates, or enhance user prompt)
       let finalPrompt = prompt
 
       if (templateSlug) {
@@ -144,21 +148,20 @@ export const useGenerate = () => {
         finalPrompt = enhanced
       }
 
-      // Update record with prompts
       await generationsDb.update(genRecord.id, {
-        prompt: prompt || null,
-        enhanced_prompt: finalPrompt,
+        prompt:          prompt      || null,
+        enhanced_prompt: finalPrompt || null,
       })
 
+      // ── Generate ─────────────────────────────────────────
       setStatus('generating')
 
-      // Call appropriate generation function
       const onProgress = (update) => setProgress(update)
       let generationResult
 
       switch (type) {
         case 'text_to_image':
-          generationResult = await textToImage({ prompt: finalPrompt, aspectRatio, onProgress })
+          generationResult = await textToImage({ prompt: finalPrompt, aspectRatio, model, onProgress })
           break
 
         case 'image_to_image':
@@ -186,19 +189,20 @@ export const useGenerate = () => {
             generationResult = await officeHandoverTemplate({ startFrameUrl, endFrameUrl, aspectRatio, duration, model, onProgress })
           } else if (templateSlug === 'memory-lane') {
             generationResult = await memoryLaneTemplate({ imageUrls, aspectRatio, duration, onProgress })
+          } else {
+            throw new Error(`Unknown template: ${templateSlug}`)
           }
           break
 
         default:
-          throw new Error('Unknown generation type')
+          throw new Error(`Unknown generation type: ${type}`)
       }
 
-      if (generationResult.error) throw new Error(generationResult.error)
+      if (generationResult?.error) throw new Error(generationResult.error)
 
-      // Update generation record as completed
       await generationsDb.update(genRecord.id, {
-        status: 'completed',
-        output_url: generationResult.outputUrl,
+        status:      'completed',
+        output_url:  generationResult.outputUrl,
         output_type: generationResult.outputType,
       })
 
@@ -210,12 +214,13 @@ export const useGenerate = () => {
     } catch (err) {
       setError(err.message)
       setStatus('error')
-      toast.error(err.message || 'Generation failed')
 
-      // Update generation as failed (trigger will auto-refund)
-      if (generationId) {
-        await generationsDb.update(generationId, {
-          status: 'failed',
+      // Credits auto-refunded by DB trigger on status = 'failed'
+      toast.error(`${err.message || 'Generation failed'} — credits will be refunded automatically.`)
+
+      if (localGenId) {
+        await generationsDb.update(localGenId, {
+          status:        'failed',
           error_message: err.message,
         })
       }
