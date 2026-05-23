@@ -1,15 +1,15 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, auth, profiles } from '@/lib/supabase'
 
 const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user,             setUser]             = useState(null)
+  const [profile,          setProfile]          = useState(null)
+  const [loading,          setLoading]          = useState(true)
   const [onboardingNeeded, setOnboardingNeeded] = useState(false)
 
-  // Load profile
   const loadProfile = async (userId) => {
     const { data } = await profiles.getById(userId)
     if (data) {
@@ -19,7 +19,6 @@ export const AuthProvider = ({ children }) => {
     return data
   }
 
-  // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
       const { session } = await auth.getSession()
@@ -32,7 +31,6 @@ export const AuthProvider = ({ children }) => {
 
     initAuth()
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
@@ -43,42 +41,34 @@ export const AuthProvider = ({ children }) => {
           setProfile(null)
           setOnboardingNeeded(false)
         }
-
-        if (event === 'PASSWORD_RECOVERY') {
-          // Handle password recovery redirect
-          window.location.href = '/auth/reset-password'
-        }
+        // PASSWORD_RECOVERY is handled by ResetPasswordPage's own listener.
+        // No redirect here — avoids blowing away React Router state.
       }
     )
 
     return () => subscription.unsubscribe()
   }, [])
 
-  // Refresh profile (after credit purchase, etc.)
   const refreshProfile = async () => {
-    if (user) {
-      await loadProfile(user.id)
-    }
+    if (user) await loadProfile(user.id)
   }
 
-  // Update profile locally (optimistic update)
+  // Optimistic local update — call after profiles.update() succeeds
   const updateProfileLocal = (updates) => {
-    setProfile(prev => ({ ...prev, ...updates }))
-  }
-
-  const value = {
-    user,
-    profile,
-    loading,
-    onboardingNeeded,
-    refreshProfile,
-    updateProfileLocal,
-    isAdmin: profile?.role === 'admin',
-    credits: profile?.credits || 0,
+    setProfile((prev) => ({ ...prev, ...updates }))
   }
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      loading,
+      onboardingNeeded,
+      refreshProfile,
+      updateProfileLocal,
+      isAdmin: profile?.role === 'admin',
+      credits: profile?.credits || 0,
+    }}>
       {children}
     </AuthContext.Provider>
   )
