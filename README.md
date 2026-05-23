@@ -6,18 +6,38 @@ A cinematic AI video and image generation web app built for African creators.
 
 ## Tech Stack
 
-| Layer       | Technology                          |
-|-------------|-------------------------------------|
-| Frontend    | React 18 + Vite                     |
-| Styling     | Tailwind CSS + CSS Variables        |
-| Animation   | Framer Motion                       |
-| Backend     | Supabase (Auth + PostgreSQL + RLS)  |
-| AI Video    | fal.ai (Kling 2.5, Seedance 1.5)   |
-| AI Image    | fal.ai (Imagen 3 / Nano Banana)     |
-| Prompt AI   | Anthropic Claude Sonnet             |
-| Payments    | Paystack (NGN)                      |
-| Deployment  | Vercel                              |
-| PWA         | Service Worker + Web Manifest       |
+| Layer          | Technology                                              |
+|----------------|---------------------------------------------------------|
+| Frontend       | React 18 + Vite                                         |
+| Styling        | Tailwind CSS + CSS Variables                            |
+| Animation      | Framer Motion                                           |
+| Backend        | Supabase (Auth + PostgreSQL + RLS)                      |
+| AI Video       | WaveSpeed (primary) · fal.ai (fallback) — admin toggle  |
+| AI Image       | fal.ai (primary) · WaveSpeed (fallback) — admin toggle  |
+| Prompt AI      | WaveSpeed → Claude Sonnet (primary) · Direct Anthropic (fallback) |
+| Payments       | Paystack (NGN)                                          |
+| Deployment     | Vercel (Serverless Functions)                           |
+| PWA            | Service Worker + Web Manifest                           |
+
+---
+
+## AI Provider Architecture
+
+Meckury uses a **hybrid dual-provider** system. The active provider is stored in Supabase and toggled at runtime from the Admin Panel — no redeployment needed.
+
+```
+WaveSpeed (primary)
+  └── Video generation: Seedance 2.0, Kling 2.5/3.0, Wan
+  └── LLM/Prompt AI:   Claude Sonnet via WaveSpeed gateway
+  └── Image generation: Nano Banana Pro / Nano Banana 2
+
+fal.ai (fallback / specific models)
+  └── Video: Seedance 2.0, Kling 3.0 Pro, Veo 3.1
+  └── Image: Imagen 3, Nano Banana 2, Flux i2i
+  └── Audio: Lyria 3
+```
+
+All API keys live server-side only. The client never touches them — all generation calls are proxied through `/api/generate` (Vercel Serverless Function).
 
 ---
 
@@ -25,11 +45,16 @@ A cinematic AI video and image generation web app built for African creators.
 
 ```
 meckury/
+├── api/
+│   ├── generate.js            # Unified AI proxy — fal.ai + WaveSpeed with fallback
+│   └── upload.js              # Image upload to Supabase Storage
+│
 ├── supabase/
 │   ├── 01_schema.sql          # All tables, enums, indexes, seed data
 │   ├── 02_functions.sql       # DB functions (credits, prompts, stats)
 │   ├── 03_triggers.sql        # Auto-refund, notifications, counters
 │   ├── 04_rls.sql             # Row Level Security policies
+│   ├── 05_app_settings.sql    # Runtime config table (provider, model toggles)
 │   └── functions/
 │       └── verify-payment/
 │           └── index.ts       # Edge Function: Paystack verification
@@ -37,8 +62,7 @@ meckury/
 ├── src/
 │   ├── lib/
 │   │   ├── supabase.js        # Supabase client + all DB helpers
-│   │   ├── fal.js             # fal.ai client + generation functions
-│   │   ├── anthropic.js       # Claude prompt enhancement
+│   │   ├── fal.js             # Generation client — proxies to /api/generate
 │   │   └── paystack.js        # Paystack popup + verification
 │   │
 │   ├── context/
@@ -57,6 +81,8 @@ meckury/
 │   │   │   ├── Input.jsx      # Input, OTPInput, Textarea
 │   │   │   ├── Modal.jsx      # Modal, Loader, Skeleton, CreditBadge, EmptyState
 │   │   │   └── ImageUpload.jsx # Single + multi image upload
+│   │   ├── admin/
+│   │   │   └── ProviderSettings.jsx  # Admin toggle: provider + model selection
 │   │   └── layout/
 │   │       ├── BottomNav.jsx  # 4-tab bottom navigation
 │   │       ├── TopBar.jsx     # Fixed top header with credits
@@ -73,12 +99,12 @@ meckury/
 │       ├── HistoryPage.jsx    # User's generation history
 │       ├── ProfilePage.jsx    # Credits, stats, purchases
 │       ├── SettingsPage.jsx   # Theme, password, profile edit
-│       └── AdminPage.jsx      # Dashboard, prompts, feed, users
+│       └── AdminPage.jsx      # Dashboard, prompts, feed, users, provider settings
 │
 ├── public/
 │   ├── manifest.json          # PWA manifest
 │   ├── sw.js                  # Service worker
-│   └── icons/                 # Add icon.png in sizes: 72,96,128,144,152,192,384,512
+│   └── icons/                 # icon.png in sizes: 72,96,128,144,152,192,384,512
 │
 ├── index.html
 ├── vite.config.js
@@ -106,15 +132,24 @@ npm install
 cp .env.example .env
 ```
 
-Fill in `.env`:
+**Client-side** (prefixed `VITE_` — safe to expose):
 
 ```env
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
-VITE_FAL_KEY=fal-...
-VITE_ANTHROPIC_KEY=sk-ant-...
 VITE_PAYSTACK_PUBLIC_KEY=pk_live_...
 ```
+
+**Server-side only** (Vercel Serverless Functions — never in client bundle):
+
+```env
+FAL_KEY=fal-...
+WAVESPEED_KEY=your-wavespeed-api-key
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+> **Note:** `VITE_ANTHROPIC_KEY` is no longer needed. Claude Sonnet is accessed through WaveSpeed using `WAVESPEED_KEY`, which also covers all video and image models. Only add a direct `ANTHROPIC_KEY` server-side if you need to bypass WaveSpeed for LLM calls.
 
 ### 3. Supabase setup
 
@@ -125,6 +160,7 @@ VITE_PAYSTACK_PUBLIC_KEY=pk_live_...
    supabase/02_functions.sql
    supabase/03_triggers.sql
    supabase/04_rls.sql
+   supabase/05_app_settings.sql
    ```
 3. Enable **Google OAuth** in Authentication → Providers
 4. Set Site URL and Redirect URLs in Authentication → URL Configuration
@@ -172,10 +208,41 @@ npm install -g vercel
 
 # Deploy
 vercel
-
-# Add environment variables in Vercel dashboard
-# Project → Settings → Environment Variables
 ```
+
+Add these in **Vercel Dashboard → Project → Settings → Environment Variables**:
+
+```
+FAL_KEY
+WAVESPEED_KEY
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_PAYSTACK_PUBLIC_KEY
+```
+
+---
+
+## Provider Toggle (Admin)
+
+After deploying, visit `/admin` → **Provider Settings** tab to:
+
+- Switch active provider between **WaveSpeed** and **fal.ai** instantly
+- Select preferred Kling model (2.5 Pro / 3.0 Pro)
+- Select preferred Seedance model (1.5 Pro / 2.0)
+- Select preferred image model (Nano Banana 2 / Nano Banana Pro)
+
+Changes take effect immediately for all new generations — no redeployment needed. If a generation fails on the active provider, the system automatically falls back to the other provider.
+
+### app_settings table
+
+| key               | default           | options                                   |
+|-------------------|-------------------|-------------------------------------------|
+| `active_provider` | `"fal"`           | `"fal"` · `"wavespeed"`                   |
+| `model_kling`     | `"kling_2_5"`     | `"kling_2_5"` · `"kling_3_0"`             |
+| `model_seedance`  | `"seedance_2_0"`  | `"seedance_1_5"` · `"seedance_2_0"`       |
+| `model_image`     | `"imagen_3_fast"` | `"imagen_3_fast"` · `"imagen_3"`          |
 
 ---
 
@@ -198,6 +265,36 @@ vercel
 | Creator  | 260     | ₦72,000  |
 
 New users receive **5 free credits** on signup. Credits never expire.
+
+---
+
+## Model Reference
+
+### WaveSpeed model IDs (used in `api/generate.js`)
+
+| Key              | Model ID                                          |
+|------------------|---------------------------------------------------|
+| `kling_2_5`      | `wavespeed-ai/kling-v2.6-pro/image-to-video`      |
+| `kling_2_5_t2v`  | `wavespeed-ai/kling-v2.6-pro/text-to-video`       |
+| `kling_3_0`      | `wavespeed-ai/kling-v3.0-pro/image-to-video`      |
+| `seedance_1_5`   | `wavespeed-ai/seedance-v1.5-pro/image-to-video`   |
+| `seedance_2_0`   | `bytedance/seedance-2.0/image-to-video`           |
+| `imagen_3_fast`  | `wavespeed-ai/google/nano-banana-2/text-to-image` |
+| `imagen_3`       | `wavespeed-ai/google/nano-banana-pro/text-to-image`|
+| `flux_i2i`       | `wavespeed-ai/flux-kontext-dev/multi`             |
+
+### fal.ai model IDs
+
+| Key              | Model ID                                          |
+|------------------|---------------------------------------------------|
+| `kling_2_5`      | `fal-ai/kling-video/v2.5/pro/image-to-video`      |
+| `kling_2_5_t2v`  | `fal-ai/kling-video/v2.5/pro/text-to-video`       |
+| `kling_3_0`      | `fal-ai/kling-video/v3.0/pro/image-to-video`      |
+| `seedance_1_5`   | `fal-ai/seedance-1-5-pro`                         |
+| `seedance_2_0`   | `fal-ai/seedance-2.0`                             |
+| `imagen_3_fast`  | `fal-ai/imagen3/fast`                             |
+| `imagen_3`       | `fal-ai/imagen3`                                  |
+| `flux_i2i`       | `fal-ai/flux/dev/image-to-image`                  |
 
 ---
 
@@ -225,10 +322,12 @@ Recommended tool: [realfavicongenerator.net](https://realfavicongenerator.net)
 Visit `/admin` after setting your role to `admin` in the database.
 
 Admin panel includes:
+
 - Dashboard stats (users, generations, revenue, success rate)
 - Prompt version manager with rollback
 - Feed moderation (approve/reject)
 - User management
+- **Provider Settings** — live toggle between WaveSpeed and fal.ai, model selection
 
 ---
 
