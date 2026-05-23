@@ -1,3 +1,4 @@
+// src/components/ui/Modal.jsx
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Zap } from 'lucide-react'
 
