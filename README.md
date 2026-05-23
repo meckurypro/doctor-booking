@@ -343,4 +343,4 @@ No redeployment needed.
 
 ## Built by
 
-[LinkAI](https://linkai.africa) · A Meckury production
+[LinkAI](https://afix.linkai) · An AFIX Initiative
