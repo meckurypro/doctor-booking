@@ -1,3 +1,4 @@
+// src/components/layout/BottomNav.jsx
 import { NavLink, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Home, Sparkles, Film, User } from 'lucide-react'
