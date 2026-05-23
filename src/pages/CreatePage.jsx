@@ -7,6 +7,7 @@ import { templates as templatesDb } from '@/lib/supabase'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Skeleton } from '@/components/ui/Modal'
+import { SmartPromptInput } from '@/components/ui/SmartPromptInput'
 import { useAuth } from '@/context/AuthContext'
 
 // ─── Tools (credit costs match README) ────────────────────
@@ -68,6 +69,17 @@ const TOOLS = [
   },
 ]
 
+// ─── Type labels for Smart tab routing ────────────────────
+
+const TYPE_LABELS = {
+  text_to_image:   'Text to Image',
+  image_to_image:  'Image to Image',
+  text_to_video:   'Text to Video',
+  image_to_video:  'Image to Video',
+  start_end_frame: 'Start + End Frame',
+  end_frame_text:  'End Frame + Text',
+}
+
 // ─── Low credits threshold ─────────────────────────────────
 const LOW_CREDIT_THRESHOLD = 3
 
@@ -76,7 +88,7 @@ const LOW_CREDIT_THRESHOLD = 3
 export default function CreatePage() {
   const navigate          = useNavigate()
   const { credits }       = useAuth()
-  const [activeTab, setActiveTab] = useState('templates')
+  const [activeTab, setActiveTab] = useState('smart')
   const [templates, setTemplates] = useState([])
   const [loading, setLoading]     = useState(true)
 
@@ -155,22 +167,60 @@ export default function CreatePage() {
           className="flex gap-1 p-1 rounded-2xl mb-6"
           style={{ background: 'var(--bg-elevated)' }}
         >
-          {['templates', 'tools'].map((tab) => (
+          {['smart', 'templates', 'tools'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all duration-200"
               style={{
-                background:  activeTab === tab ? 'var(--bg-card)' : 'transparent',
-                color:       activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
-                boxShadow:   activeTab === tab ? 'var(--shadow)' : 'none',
-                fontFamily:  'Syne, sans-serif',
+                background: activeTab === tab ? 'var(--bg-card)' : 'transparent',
+                color:      activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+                boxShadow:  activeTab === tab ? 'var(--shadow)' : 'none',
+                fontFamily: 'Syne, sans-serif',
               }}
             >
-              {tab}
+              {tab === 'smart' ? '✦ AI' : tab}
             </button>
           ))}
         </div>
+
+        {/* Smart Tab */}
+        {activeTab === 'smart' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-5">
+              <p
+                className="text-xs font-semibold mb-1 uppercase tracking-wide"
+                style={{ color: 'var(--brand)' }}
+              >
+                ✦ AI-powered
+              </p>
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                Describe anything — Claude picks the right tool, refines your prompt, and gets you to generate in one step.
+              </p>
+            </div>
+            <SmartPromptInput
+              onConfirm={(data) => {
+                // Route to GeneratePage with AI-resolved parameters
+                navigate('/generate', {
+                  state: {
+                    type:           data.templateSlug ? 'template' : data.type,
+                    templateSlug:   data.templateSlug || null,
+                    templateName:   data.templateSlug
+                                      ? data.templateSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                                      : null,
+                    toolLabel:      TYPE_LABELS[data.type] || 'AI Creation',
+                    prompt:         data.enhanced_prompt,
+                    aspectRatio:    data.aspect_ratio,
+                    duration:       data.duration,
+                    model:          data.model,
+                    prefillImages:  data.uploadedImages || [],
+                    smartGenerated: true,
+                  },
+                })
+              }}
+            />
+          </motion.div>
+        )}
 
         {/* Templates Tab */}
         {activeTab === 'templates' && (
