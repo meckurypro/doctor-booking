@@ -1,3 +1,4 @@
+// vite.config.js
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -13,10 +14,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
+          vendor:   ['react', 'react-dom', 'react-router-dom'],
           supabase: ['@supabase/supabase-js'],
-          fal: ['@fal-ai/client'],
-          motion: ['framer-motion'],
+          motion:   ['framer-motion'],
         },
       },
     },
