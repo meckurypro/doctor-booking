@@ -1,4 +1,4 @@
-# Meckury — AI Content Creation Platform
+# Meckury AI — Cinematic Content Creation Platform
 
 A cinematic AI video and image generation web app built for African creators.
 
