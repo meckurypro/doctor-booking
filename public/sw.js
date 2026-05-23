@@ -1,4 +1,5 @@
-const CACHE_NAME = 'meckury-v1'
+// public/sw.js
+const CACHE_NAME    = 'meckury-v1'
 const STATIC_ASSETS = ['/', '/index.html', '/manifest.json']
 
 self.addEventListener('install', (event) => {
@@ -18,14 +19,17 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
-  // Only cache GET requests
   if (event.request.method !== 'GET') return
 
-  // Don't cache API calls
-  if (event.request.url.includes('/api/') ||
-      event.request.url.includes('supabase') ||
-      event.request.url.includes('fal.ai') ||
-      event.request.url.includes('anthropic')) return
+  const url = event.request.url
+  if (
+    url.includes('/api/')       ||
+    url.includes('supabase')    ||
+    url.includes('fal.ai')      ||
+    url.includes('anthropic')   ||
+    url.includes('paystack')    ||
+    url.includes('googleapis')
+  ) return
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
