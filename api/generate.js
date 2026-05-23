@@ -1,5 +1,12 @@
 // api/generate.js
-import { fal } from '@fal-ai/client'
+// ============================================================
+// Unified AI generation proxy — fal.ai + WaveSpeed
+// Provider is read from Supabase app_settings at runtime.
+// API keys never touch the client bundle.
+// ============================================================
+
+import { fal }          from '@fal-ai/client'
+import { createClient } from '@supabase/supabase-js'
 
 fal.config({ credentials: process.env.FAL_KEY })
 
@@ -9,40 +16,43 @@ const WAVESPEED_KEY = process.env.WAVESPEED_KEY
 
 const MODELS = {
   fal: {
-    kling_2_5:        'fal-ai/kling-video/v2.5/pro/image-to-video',
-    kling_2_5_t2v:    'fal-ai/kling-video/v2.5/pro/text-to-video',
-    kling_3_0:        'fal-ai/kling-video/v3.0/pro/image-to-video',
-    seedance_1_5:     'fal-ai/seedance-1-5-pro',
-    seedance_2_0:     'fal-ai/seedance-2.0',
-    imagen_3:         'fal-ai/imagen3',
-    imagen_3_fast:    'fal-ai/imagen3/fast',
-    flux_i2i:         'fal-ai/flux/dev/image-to-image',
+    kling_2_5:     'fal-ai/kling-video/v2.5/pro/image-to-video',
+    kling_2_5_t2v: 'fal-ai/kling-video/v2.5/pro/text-to-video',
+    kling_3_0:     'fal-ai/kling-video/v3.0/pro/image-to-video',
+    seedance_1_5:  'fal-ai/seedance-1-5-pro',
+    seedance_2_0:  'fal-ai/seedance-2.0',
+    imagen_3:      'fal-ai/imagen3',
+    imagen_3_fast: 'fal-ai/imagen3/fast',
+    flux_i2i:      'fal-ai/flux/dev/image-to-image',
   },
   wavespeed: {
-    kling_2_5:        'kling-v2.6-pro/image-to-video',
-    kling_2_5_t2v:    'kling-v2.6-pro/text-to-video',
-    kling_3_0:        'kling-v3.0-pro/image-to-video',
-    seedance_1_5:     'seedance-v1.5-pro/image-to-video',
-    seedance_2_0:     'seedance-2.0/image-to-video',
-    imagen_3:         'google/nano-banana-pro/text-to-image',
-    imagen_3_fast:    'google/nano-banana-2/text-to-image',
-    flux_i2i:         'flux-kontext-dev/multi',
+    kling_2_5:     'wavespeed-ai/kling-v2.6-pro/image-to-video',
+    kling_2_5_t2v: 'wavespeed-ai/kling-v2.6-pro/text-to-video',
+    kling_3_0:     'wavespeed-ai/kling-v3.0-pro/image-to-video',
+    seedance_1_5:  'wavespeed-ai/seedance-v1.5-pro/image-to-video',
+    seedance_2_0:  'bytedance/seedance-2.0/image-to-video',
+    imagen_3:      'wavespeed-ai/google/nano-banana-pro/text-to-image',
+    imagen_3_fast: 'wavespeed-ai/google/nano-banana-2/text-to-image',
+    flux_i2i:      'wavespeed-ai/flux-kontext-dev/multi',
   },
 }
 
-// ── Provider runners ───────────────────────────────────────
+// ── fal.ai runner ──────────────────────────────────────────
 
 const runFal = async (modelKey, input) => {
   const endpoint = MODELS.fal[modelKey]
   if (!endpoint) throw new Error(`Unknown fal model: ${modelKey}`)
-  return fal.subscribe(endpoint, { input, pollInterval: 3000 })
+  const result = await fal.subscribe(endpoint, { input, pollInterval: 3000 })
+  return { raw: result, provider: 'fal' }
 }
+
+// ── WaveSpeed runner ───────────────────────────────────────
 
 const runWavespeed = async (modelKey, input) => {
   const model = MODELS.wavespeed[modelKey]
   if (!model) throw new Error(`Unknown wavespeed model: ${modelKey}`)
 
-  const response = await fetch(`https://api.wavespeed.ai/api/v3/predictions`, {
+  const response = await fetch('https://api.wavespeed.ai/api/v3/predictions', {
     method:  'POST',
     headers: {
       'Content-Type':  'application/json',
@@ -51,12 +61,18 @@ const runWavespeed = async (modelKey, input) => {
     body: JSON.stringify({ model, input }),
   })
 
-  if (!response.ok) throw new Error(`WaveSpeed error: ${response.status}`)
+  if (!response.ok) {
+    const errText = await response.text().catch(() => response.status)
+    throw new Error(`WaveSpeed submit error ${response.status}: ${errText}`)
+  }
 
-  const { id } = await response.json()
+  const submission = await response.json()
+  const predictionId = submission?.data?.id || submission?.id
 
-  // Poll for result
-  return pollWavespeed(id)
+  if (!predictionId) throw new Error('WaveSpeed returned no prediction ID')
+
+  const raw = await pollWavespeed(predictionId)
+  return { raw, provider: 'wavespeed' }
 }
 
 const pollWavespeed = async (predictionId, maxAttempts = 120) => {
@@ -66,31 +82,21 @@ const pollWavespeed = async (predictionId, maxAttempts = 120) => {
     const res  = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${predictionId}`, {
       headers: { 'Authorization': `Bearer ${WAVESPEED_KEY}` },
     })
-    const data = await res.json()
 
-    if (data.status === 'completed') return data.output
-    if (data.status === 'failed')    throw new Error(data.error || 'WaveSpeed generation failed')
+    if (!res.ok) throw new Error(`WaveSpeed poll error ${res.status}`)
+
+    const data = await res.json()
+    // WaveSpeed wraps response in data envelope
+    const prediction = data?.data || data
+
+    console.log(`[WaveSpeed poll ${i + 1}] status: ${prediction.status}`)
+
+    if (prediction.status === 'completed') return prediction
+    if (prediction.status === 'failed')    throw new Error(prediction.error || 'WaveSpeed generation failed')
+    // 'processing' | 'queued' → keep polling
   }
 
-  throw new Error('WaveSpeed generation timed out')
-}
-
-// ── Active provider from Supabase settings ─────────────────
-
-const { createClient } = await import('@supabase/supabase-js')
-
-const getSettings = async () => {
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
-
-  const { data } = await supabase
-    .from('app_settings')
-    .select('key, value')
-    .in('key', ['active_provider', 'model_kling', 'model_seedance', 'model_image'])
-
-  return Object.fromEntries((data || []).map((r) => [r.key, JSON.parse(r.value)]))
+  throw new Error('WaveSpeed generation timed out after 6 minutes')
 }
 
 // ── Unified runner with fallback ───────────────────────────
@@ -100,29 +106,72 @@ const runModel = async (modelKey, input, provider) => {
     if (provider === 'wavespeed') return await runWavespeed(modelKey, input)
     return await runFal(modelKey, input)
   } catch (err) {
-    console.warn(`[${provider}] failed, trying fallback:`, err.message)
-    // Fallback to the other provider
-    if (provider === 'wavespeed') return await runFal(modelKey, input)
+    const fallback = provider === 'wavespeed' ? 'fal' : 'wavespeed'
+    console.warn(`[${provider}] failed (${err.message}), falling back to ${fallback}`)
+    if (fallback === 'fal') return await runFal(modelKey, input)
     return await runWavespeed(modelKey, input)
   }
 }
 
 // ── Output normalizers ─────────────────────────────────────
-// fal and wavespeed return different shapes — normalize here
+// fal and WaveSpeed return different shapes — normalize to { outputUrl, outputType }
 
-const getImageUrl = (result, provider) => {
-  if (provider === 'fal') return result.images?.[0]?.url
-  return result?.images?.[0] || result?.url || null
+const extractImageUrl = ({ raw, provider }) => {
+  if (provider === 'fal') {
+    return raw?.images?.[0]?.url || raw?.image?.url || null
+  }
+  // WaveSpeed: outputs is array of URLs or objects
+  const outputs = raw?.outputs
+  if (!outputs) return null
+  if (Array.isArray(outputs)) {
+    const first = outputs[0]
+    return typeof first === 'string' ? first : first?.url || null
+  }
+  return outputs?.url || null
 }
 
-const getVideoUrl = (result, provider) => {
-  if (provider === 'fal') return result.video?.url
-  return result?.video?.url || result?.url || null
+const extractVideoUrl = ({ raw, provider }) => {
+  if (provider === 'fal') {
+    return raw?.video?.url || raw?.videos?.[0]?.url || null
+  }
+  // WaveSpeed
+  const outputs = raw?.outputs
+  if (!outputs) return null
+  if (Array.isArray(outputs)) {
+    const first = outputs[0]
+    return typeof first === 'string' ? first : first?.url || null
+  }
+  return outputs?.url || null
+}
+
+// ── Supabase settings loader ───────────────────────────────
+
+const getSettings = async () => {
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+
+  const { data, error } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['active_provider', 'model_kling', 'model_seedance', 'model_image'])
+
+  if (error) {
+    console.warn('Could not load app_settings, using defaults:', error.message)
+    return {}
+  }
+
+  return Object.fromEntries((data || []).map((r) => {
+    try   { return [r.key, JSON.parse(r.value)] }
+    catch { return [r.key, r.value] }
+  }))
 }
 
 // ── Action handlers ────────────────────────────────────────
 
 const buildHandlers = (settings, provider) => ({
+
   text_to_image: async ({ prompt, aspectRatio }) => {
     const modelKey = settings.model_image || 'imagen_3_fast'
     const result   = await runModel(modelKey, {
@@ -131,7 +180,7 @@ const buildHandlers = (settings, provider) => ({
       num_images:          1,
       safety_filter_level: 'block_medium_and_above',
     }, provider)
-    return { outputUrl: getImageUrl(result, provider), outputType: 'image' }
+    return { outputUrl: extractImageUrl(result), outputType: 'image', provider: result.provider }
   },
 
   image_to_image: async ({ prompt, imageUrl, strength = 0.8 }) => {
@@ -142,7 +191,7 @@ const buildHandlers = (settings, provider) => ({
       num_inference_steps: 28,
       num_images:          1,
     }, provider)
-    return { outputUrl: getImageUrl(result, provider), outputType: 'image' }
+    return { outputUrl: extractImageUrl(result), outputType: 'image', provider: result.provider }
   },
 
   text_to_video: async ({ prompt, aspectRatio, duration, model }) => {
@@ -155,7 +204,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio: aspectRatio,
       duration:     parseInt(duration),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 
   image_to_video: async ({ prompt, imageUrl, aspectRatio, duration, model }) => {
@@ -169,7 +218,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio: aspectRatio,
       duration:     parseInt(duration),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 
   start_end_frame: async ({ prompt, startFrameUrl, endFrameUrl, aspectRatio, duration, model }) => {
@@ -181,7 +230,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio:   aspectRatio,
       duration:       parseInt(duration),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 
   end_frame_text: async ({ prompt, endFrameUrl, aspectRatio, duration }) => {
@@ -191,7 +240,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio:   aspectRatio,
       duration:       parseInt(duration),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 
   template_office_handover: async ({ startFrameUrl, endFrameUrl, aspectRatio, duration, model, templatePrompt }) => {
@@ -203,7 +252,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio:   aspectRatio,
       duration:       parseInt(duration),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 
   template_memory_lane: async ({ imageUrls, aspectRatio, duration, templatePrompt }) => {
@@ -214,7 +263,7 @@ const buildHandlers = (settings, provider) => ({
       aspect_ratio:   aspectRatio,
       duration:       Math.min(parseInt(duration) * imageUrls.length, 15),
     }, provider)
-    return { outputUrl: getVideoUrl(result, provider), outputType: 'video' }
+    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
   },
 })
 
@@ -227,10 +276,14 @@ export default async function handler(req, res) {
 
   const { action, ...payload } = req.body
 
+  if (!action) {
+    return res.status(400).json({ error: 'Missing action' })
+  }
+
   try {
-    const settings  = await getSettings()
-    const provider  = settings.active_provider || 'fal'
-    const handlers  = buildHandlers(settings, provider)
+    const settings = await getSettings()
+    const provider = settings.active_provider || 'fal'
+    const handlers = buildHandlers(settings, provider)
 
     if (!handlers[action]) {
       return res.status(400).json({ error: `Unknown action: ${action}` })
@@ -238,11 +291,14 @@ export default async function handler(req, res) {
 
     const result = await handlers[action](payload)
 
-    if (!result?.outputUrl) throw new Error('Generation returned no output URL')
+    if (!result?.outputUrl) {
+      throw new Error(`Generation succeeded but returned no output URL (provider: ${result?.provider || provider})`)
+    }
 
-    return res.status(200).json({ ...result, provider })
+    return res.status(200).json(result)
+
   } catch (error) {
-    console.error(`Generation error [${action}]:`, error.message)
+    console.error(`[generate] action=${action} error:`, error.message)
     return res.status(500).json({ error: error.message || 'Generation failed' })
   }
 }
