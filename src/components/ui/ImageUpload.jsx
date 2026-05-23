@@ -1,3 +1,4 @@
+// src/components/ui/ImageUpload.jsx
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, X, ImageIcon, Plus } from 'lucide-react'
