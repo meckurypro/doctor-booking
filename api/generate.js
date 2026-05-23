@@ -1,156 +1,55 @@
-// api/generate.js
 // ============================================================
-// Unified AI generation proxy — fal.ai + WaveSpeed
-// Provider is read from Supabase app_settings at runtime.
-// API keys never touch the client bundle.
+// api/generate.js — Vercel Serverless Function
+// Unified AI generation proxy — WaveSpeed + fal.ai
+// API keys are server-side only. Client never sees them.
+//
+// POST /api/generate
+// Body: { action, provider?, ...params }
 // ============================================================
 
-import { fal }          from '@fal-ai/client'
 import { createClient } from '@supabase/supabase-js'
 
-fal.config({ credentials: process.env.FAL_KEY })
+// ── Supabase (service role — server only) ─────────────────
 
-const WAVESPEED_KEY = process.env.WAVESPEED_KEY
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
 
-// ── Model registry ─────────────────────────────────────────
+// ── Model registry ────────────────────────────────────────
 
-const MODELS = {
-  fal: {
-    kling_2_5:     'fal-ai/kling-video/v2.5/pro/image-to-video',
-    kling_2_5_t2v: 'fal-ai/kling-video/v2.5/pro/text-to-video',
-    kling_3_0:     'fal-ai/kling-video/v3.0/pro/image-to-video',
-    seedance_1_5:  'fal-ai/seedance-1-5-pro',
-    seedance_2_0:  'fal-ai/seedance-2.0',
-    imagen_3:      'fal-ai/imagen3',
-    imagen_3_fast: 'fal-ai/imagen3/fast',
-    flux_i2i:      'fal-ai/flux/dev/image-to-image',
-  },
-  wavespeed: {
-    kling_2_5:     'wavespeed-ai/kling-v2.6-pro/image-to-video',
-    kling_2_5_t2v: 'wavespeed-ai/kling-v2.6-pro/text-to-video',
-    kling_3_0:     'wavespeed-ai/kling-v3.0-pro/image-to-video',
-    seedance_1_5:  'wavespeed-ai/seedance-v1.5-pro/image-to-video',
-    seedance_2_0:  'bytedance/seedance-2.0/image-to-video',
-    imagen_3:      'wavespeed-ai/google/nano-banana-pro/text-to-image',
-    imagen_3_fast: 'wavespeed-ai/google/nano-banana-2/text-to-image',
-    flux_i2i:      'wavespeed-ai/flux-kontext-dev/multi',
-  },
+const WS_MODELS = {
+  kling_2_5:     'wavespeed-ai/kling-v2.6-pro/image-to-video',
+  kling_2_5_t2v: 'wavespeed-ai/kling-v2.6-pro/text-to-video',
+  kling_3_0:     'wavespeed-ai/kling-v3.0-pro/image-to-video',
+  seedance_1_5:  'wavespeed-ai/seedance-v1.5-pro/image-to-video',
+  seedance_2_0:  'bytedance/seedance-2.0/image-to-video',
+  imagen_3_fast: 'wavespeed-ai/google/nano-banana-2/text-to-image',
+  imagen_3:      'wavespeed-ai/google/nano-banana-pro/text-to-image',
+  flux_i2i:      'wavespeed-ai/flux-kontext-dev/multi',
 }
 
-// ── fal.ai runner ──────────────────────────────────────────
-
-const runFal = async (modelKey, input) => {
-  const endpoint = MODELS.fal[modelKey]
-  if (!endpoint) throw new Error(`Unknown fal model: ${modelKey}`)
-  const result = await fal.subscribe(endpoint, { input, pollInterval: 3000 })
-  return { raw: result, provider: 'fal' }
+const FAL_MODELS = {
+  kling_2_5:     'fal-ai/kling-video/v2.5/pro/image-to-video',
+  kling_2_5_t2v: 'fal-ai/kling-video/v2.5/pro/text-to-video',
+  kling_3_0:     'fal-ai/kling-video/v3.0/pro/image-to-video',
+  seedance_1_5:  'fal-ai/seedance-1-5-pro',
+  seedance_2_0:  'fal-ai/seedance-2.0',
+  imagen_3_fast: 'fal-ai/imagen3/fast',
+  imagen_3:      'fal-ai/imagen3',
+  flux_i2i:      'fal-ai/flux/dev/image-to-image',
 }
 
-// ── WaveSpeed runner ───────────────────────────────────────
+// ── Settings cache (5-min TTL) ────────────────────────────
+// Avoids a DB round-trip on every request.
+// Vercel serverless instances are short-lived so this is safe.
 
-const runWavespeed = async (modelKey, input) => {
-  const model = MODELS.wavespeed[modelKey]
-  if (!model) throw new Error(`Unknown wavespeed model: ${modelKey}`)
-
-  const response = await fetch('https://api.wavespeed.ai/api/v3/predictions', {
-    method:  'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': `Bearer ${WAVESPEED_KEY}`,
-    },
-    body: JSON.stringify({ model, input }),
-  })
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => response.status)
-    throw new Error(`WaveSpeed submit error ${response.status}: ${errText}`)
-  }
-
-  const submission = await response.json()
-  const predictionId = submission?.data?.id || submission?.id
-
-  if (!predictionId) throw new Error('WaveSpeed returned no prediction ID')
-
-  const raw = await pollWavespeed(predictionId)
-  return { raw, provider: 'wavespeed' }
-}
-
-const pollWavespeed = async (predictionId, maxAttempts = 120) => {
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, 3000))
-
-    const res  = await fetch(`https://api.wavespeed.ai/api/v3/predictions/${predictionId}`, {
-      headers: { 'Authorization': `Bearer ${WAVESPEED_KEY}` },
-    })
-
-    if (!res.ok) throw new Error(`WaveSpeed poll error ${res.status}`)
-
-    const data = await res.json()
-    // WaveSpeed wraps response in data envelope
-    const prediction = data?.data || data
-
-    console.log(`[WaveSpeed poll ${i + 1}] status: ${prediction.status}`)
-
-    if (prediction.status === 'completed') return prediction
-    if (prediction.status === 'failed')    throw new Error(prediction.error || 'WaveSpeed generation failed')
-    // 'processing' | 'queued' → keep polling
-  }
-
-  throw new Error('WaveSpeed generation timed out after 6 minutes')
-}
-
-// ── Unified runner with fallback ───────────────────────────
-
-const runModel = async (modelKey, input, provider) => {
-  try {
-    if (provider === 'wavespeed') return await runWavespeed(modelKey, input)
-    return await runFal(modelKey, input)
-  } catch (err) {
-    const fallback = provider === 'wavespeed' ? 'fal' : 'wavespeed'
-    console.warn(`[${provider}] failed (${err.message}), falling back to ${fallback}`)
-    if (fallback === 'fal') return await runFal(modelKey, input)
-    return await runWavespeed(modelKey, input)
-  }
-}
-
-// ── Output normalizers ─────────────────────────────────────
-// fal and WaveSpeed return different shapes — normalize to { outputUrl, outputType }
-
-const extractImageUrl = ({ raw, provider }) => {
-  if (provider === 'fal') {
-    return raw?.images?.[0]?.url || raw?.image?.url || null
-  }
-  // WaveSpeed: outputs is array of URLs or objects
-  const outputs = raw?.outputs
-  if (!outputs) return null
-  if (Array.isArray(outputs)) {
-    const first = outputs[0]
-    return typeof first === 'string' ? first : first?.url || null
-  }
-  return outputs?.url || null
-}
-
-const extractVideoUrl = ({ raw, provider }) => {
-  if (provider === 'fal') {
-    return raw?.video?.url || raw?.videos?.[0]?.url || null
-  }
-  // WaveSpeed
-  const outputs = raw?.outputs
-  if (!outputs) return null
-  if (Array.isArray(outputs)) {
-    const first = outputs[0]
-    return typeof first === 'string' ? first : first?.url || null
-  }
-  return outputs?.url || null
-}
-
-// ── Supabase settings loader ───────────────────────────────
+let _settings    = null
+let _settingsTtl = 0
+const SETTINGS_TTL = 5 * 60 * 1000
 
 const getSettings = async () => {
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  if (_settings && Date.now() < _settingsTtl) return _settings
 
   const { data, error } = await supabase
     .from('app_settings')
@@ -158,147 +57,365 @@ const getSettings = async () => {
     .in('key', ['active_provider', 'model_kling', 'model_seedance', 'model_image'])
 
   if (error) {
-    console.warn('Could not load app_settings, using defaults:', error.message)
-    return {}
+    console.warn('[settings] Failed to load, using defaults:', error.message)
+    return _settings || {}
   }
 
-  return Object.fromEntries((data || []).map((r) => {
-    try   { return [r.key, JSON.parse(r.value)] }
-    catch { return [r.key, r.value] }
-  }))
+  _settings    = {}
+  _settingsTtl = Date.now() + SETTINGS_TTL
+
+  for (const row of data || []) {
+    try   { _settings[row.key] = JSON.parse(row.value) }
+    catch { _settings[row.key] = row.value }
+  }
+
+  return _settings
 }
 
-// ── Action handlers ────────────────────────────────────────
+// ── WaveSpeed — submit + poll ─────────────────────────────
 
-const buildHandlers = (settings, provider) => ({
+const callWaveSpeed = async (modelId, input) => {
+  // Submit
+  const submitRes = await fetch('https://api.wavespeed.ai/api/v3/predictions', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${process.env.WAVESPEED_KEY}`,
+    },
+    body: JSON.stringify({ model: modelId, input }),
+  })
 
-  text_to_image: async ({ prompt, aspectRatio }) => {
-    const modelKey = settings.model_image || 'imagen_3_fast'
-    const result   = await runModel(modelKey, {
-      prompt,
-      aspect_ratio:        aspectRatio,
-      num_images:          1,
-      safety_filter_level: 'block_medium_and_above',
-    }, provider)
-    return { outputUrl: extractImageUrl(result), outputType: 'image', provider: result.provider }
+  if (!submitRes.ok) {
+    const err = await submitRes.json().catch(() => ({}))
+    throw new Error(err.detail || err.message || `WaveSpeed submit error ${submitRes.status}`)
+  }
+
+  const { data: submission } = await submitRes.json()
+  const predictionId = submission?.id
+  if (!predictionId) throw new Error('WaveSpeed: no prediction ID returned')
+
+  // Poll
+  const deadline = Date.now() + 120_000
+  while (Date.now() < deadline) {
+    await sleep(3000)
+
+    const pollRes = await fetch(
+      `https://api.wavespeed.ai/api/v3/predictions/${predictionId}`,
+      { headers: { Authorization: `Bearer ${process.env.WAVESPEED_KEY}` } }
+    )
+
+    if (!pollRes.ok) throw new Error(`WaveSpeed poll error ${pollRes.status}`)
+
+    const { data: result } = await pollRes.json()
+    console.log(`[WaveSpeed] ${predictionId} -> ${result?.status}`)
+
+    if (result?.status === 'completed') return extractWaveSpeedUrl(result)
+    if (result?.status === 'failed')    throw new Error(result.error || 'WaveSpeed: generation failed')
+    // 'queued' | 'processing' -> keep polling
+  }
+
+  throw new Error('WaveSpeed: generation timed out after 2 minutes')
+}
+
+// WaveSpeed outputs can be a string-URL array OR an object array.
+// Handle both shapes defensively.
+const extractWaveSpeedUrl = (result) => {
+  const outputs = result?.outputs
+  if (Array.isArray(outputs) && outputs.length > 0) {
+    const first = outputs[0]
+    const url   = typeof first === 'string' ? first : first?.url || null
+    if (url) return url
+  }
+  const url = result?.output?.url || result?.output || null
+  if (!url) throw new Error('WaveSpeed: no output URL in completed result')
+  return url
+}
+
+// ── fal.ai — submit + poll (raw fetch, no SDK) ────────────
+
+const callFal = async (modelId, input) => {
+  // Submit to queue
+  const submitRes = await fetch(`https://queue.fal.run/${modelId}`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Key ${process.env.FAL_KEY}`,
+    },
+    body: JSON.stringify(input),
+  })
+
+  if (!submitRes.ok) {
+    const err = await submitRes.json().catch(() => ({}))
+    throw new Error(err.detail || err.message || `fal.ai submit error ${submitRes.status}`)
+  }
+
+  const { request_id } = await submitRes.json()
+  if (!request_id) throw new Error('fal.ai: no request_id returned')
+
+  // Poll status
+  const deadline = Date.now() + 120_000
+  while (Date.now() < deadline) {
+    await sleep(3000)
+
+    const statusRes = await fetch(
+      `https://queue.fal.run/${modelId}/requests/${request_id}/status`,
+      { headers: { Authorization: `Key ${process.env.FAL_KEY}` } }
+    )
+
+    if (!statusRes.ok) throw new Error(`fal.ai poll error ${statusRes.status}`)
+
+    const status = await statusRes.json()
+    console.log(`[fal.ai] ${request_id} -> ${status?.status}`)
+
+    if (status?.status === 'COMPLETED') {
+      const resultRes = await fetch(
+        `https://queue.fal.run/${modelId}/requests/${request_id}`,
+        { headers: { Authorization: `Key ${process.env.FAL_KEY}` } }
+      )
+      const result = await resultRes.json()
+      return extractFalUrl(result)
+    }
+    if (status?.status === 'FAILED') {
+      throw new Error(status?.error || 'fal.ai: generation failed')
+    }
+  }
+
+  throw new Error('fal.ai: generation timed out after 2 minutes')
+}
+
+const extractFalUrl = (result) => {
+  const url = result?.video?.url
+           || result?.videos?.[0]?.url
+           || result?.images?.[0]?.url
+           || result?.image?.url
+           || null
+  if (!url) throw new Error('fal.ai: no output URL in completed result')
+  return url
+}
+
+// ── Prompt enhancement via Claude ─────────────────────────
+// Primary:  Claude Sonnet via WaveSpeed LLM gateway (uses WAVESPEED_KEY).
+// Fallback: Direct Anthropic API (uses ANTHROPIC_KEY if set).
+// Silent fail: returns original prompt if both are unavailable.
+
+const ENHANCE_SYSTEM = `You are an expert AI video and image prompt engineer.
+Enhance the user's prompt for cinematic AI generation.
+Preserve the EXACT core action and intent — do not change what happens.
+Add camera movement, lighting, motion dynamics, and cinematic language.
+Keep under 200 words. Return ONLY the enhanced prompt, no explanation.`
+
+const enhancePrompt = async (prompt, type = 'video') => {
+  const userMessage = `Enhance this ${type} generation prompt:\n\n${prompt}`
+
+  // Try WaveSpeed LLM gateway first
+  try {
+    const res = await fetch('https://api.wavespeed.ai/api/v3/llm/messages', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${process.env.WAVESPEED_KEY}`,
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        system:     ENHANCE_SYSTEM,
+        messages:   [{ role: 'user', content: userMessage }],
+      }),
+    })
+    if (!res.ok) throw new Error(`WaveSpeed LLM ${res.status}`)
+    const data     = await res.json()
+    const enhanced = data?.content?.[0]?.text?.trim()
+    if (enhanced) return enhanced
+    throw new Error('empty response')
+  } catch (err) {
+    console.warn('[enhancePrompt] WaveSpeed LLM failed:', err.message)
+  }
+
+  // Fallback: direct Anthropic API
+  if (process.env.ANTHROPIC_KEY) {
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method:  'POST',
+        headers: {
+          'Content-Type':      'application/json',
+          'x-api-key':         process.env.ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model:      'claude-sonnet-4-20250514',
+          max_tokens: 400,
+          system:     ENHANCE_SYSTEM,
+          messages:   [{ role: 'user', content: userMessage }],
+        }),
+      })
+      if (!res.ok) throw new Error(`Anthropic ${res.status}`)
+      const data     = await res.json()
+      const enhanced = data?.content?.[0]?.text?.trim()
+      if (enhanced) return enhanced
+    } catch (err) {
+      console.warn('[enhancePrompt] Anthropic fallback failed:', err.message)
+    }
+  }
+
+  return prompt // silent fail — use original
+}
+
+// ── Helpers ───────────────────────────────────────────────
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+const run = (provider, modelKey, input) => {
+  if (provider === 'wavespeed') {
+    const modelId = WS_MODELS[modelKey]
+    if (!modelId) throw new Error(`Unknown WaveSpeed model key: ${modelKey}`)
+    return callWaveSpeed(modelId, input)
+  }
+  const modelId = FAL_MODELS[modelKey]
+  if (!modelId) throw new Error(`Unknown fal.ai model key: ${modelKey}`)
+  return callFal(modelId, input)
+}
+
+// ── Action handlers ───────────────────────────────────────
+
+const handlers = {
+
+  async text_to_image({ prompt, aspectRatio = '9:16', model }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'image')
+    const modelKey = model || settings.model_image || 'imagen_3_fast'
+    const url      = await run(provider, modelKey, {
+      prompt:       enhanced,
+      aspect_ratio: aspectRatio,
+      num_images:   1,
+    })
+    return { outputUrl: url, outputType: 'image' }
   },
 
-  image_to_image: async ({ prompt, imageUrl, strength = 0.8 }) => {
-    const result = await runModel('flux_i2i', {
-      prompt,
-      image_url:           imageUrl,
+  async image_to_image({ prompt, imageUrl, strength = 0.8 }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'image')
+    const url      = await run(provider, 'flux_i2i', {
+      prompt:     enhanced,
+      image_url:  imageUrl,
       strength,
-      num_inference_steps: 28,
-      num_images:          1,
-    }, provider)
-    return { outputUrl: extractImageUrl(result), outputType: 'image', provider: result.provider }
+      num_images: 1,
+    })
+    return { outputUrl: url, outputType: 'image' }
   },
 
-  text_to_video: async ({ prompt, aspectRatio, duration, model }) => {
-    const modelKey = model === 'seedance_2_0' ? 'seedance_2_0'
-                   : model === 'seedance_1_5' ? 'seedance_1_5'
-                   : model === 'kling_3_0'    ? 'kling_3_0'
-                   : 'kling_2_5_t2v'
-    const result   = await runModel(modelKey, {
-      prompt,
+  async text_to_video({ prompt, aspectRatio = '9:16', duration = '5', model }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'video')
+    const baseKey  = model || settings.model_kling || 'kling_2_5'
+    const url      = await run(provider, `${baseKey}_t2v`, {
+      prompt:       enhanced,
       aspect_ratio: aspectRatio,
       duration:     parseInt(duration),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+    })
+    return { outputUrl: url, outputType: 'video' }
   },
 
-  image_to_video: async ({ prompt, imageUrl, aspectRatio, duration, model }) => {
-    const modelKey = model === 'seedance_2_0' ? 'seedance_2_0'
-                   : model === 'seedance_1_5' ? 'seedance_1_5'
-                   : model === 'kling_3_0'    ? 'kling_3_0'
-                   : 'kling_2_5'
-    const result   = await runModel(modelKey, {
-      prompt,
+  async image_to_video({ prompt, imageUrl, aspectRatio = '9:16', duration = '5', model }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'video')
+    const modelKey = model || settings.model_kling || 'kling_2_5'
+    const url      = await run(provider, modelKey, {
+      prompt:       enhanced,
       image_url:    imageUrl,
       aspect_ratio: aspectRatio,
       duration:     parseInt(duration),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+    })
+    return { outputUrl: url, outputType: 'video' }
   },
 
-  start_end_frame: async ({ prompt, startFrameUrl, endFrameUrl, aspectRatio, duration, model }) => {
-    const modelKey = model === 'kling_3_0' ? 'kling_3_0' : 'kling_2_5'
-    const result   = await runModel(modelKey, {
-      prompt,
+  async start_end_frame({ prompt, startFrameUrl, endFrameUrl, aspectRatio = '9:16', duration = '5', model }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'video')
+    const modelKey = model || settings.model_kling || 'kling_2_5'
+    const url      = await run(provider, modelKey, {
+      prompt:         enhanced,
       image_url:      startFrameUrl,
       tail_image_url: endFrameUrl,
       aspect_ratio:   aspectRatio,
       duration:       parseInt(duration),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+    })
+    return { outputUrl: url, outputType: 'video' }
   },
 
-  end_frame_text: async ({ prompt, endFrameUrl, aspectRatio, duration }) => {
-    const result = await runModel('kling_2_5', {
-      prompt,
+  async end_frame_text({ prompt, endFrameUrl, aspectRatio = '9:16', duration = '5', model }, settings, provider) {
+    const enhanced = await enhancePrompt(prompt, 'video')
+    const modelKey = model || settings.model_kling || 'kling_2_5'
+    const url      = await run(provider, modelKey, {
+      prompt:         enhanced,
       tail_image_url: endFrameUrl,
       aspect_ratio:   aspectRatio,
       duration:       parseInt(duration),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+    })
+    return { outputUrl: url, outputType: 'video' }
   },
 
-  template_office_handover: async ({ startFrameUrl, endFrameUrl, aspectRatio, duration, model, templatePrompt }) => {
-    const modelKey = model === 'kling_3_0' ? 'kling_3_0' : 'kling_2_5'
-    const result   = await runModel(modelKey, {
-      prompt:         templatePrompt,
-      image_url:      startFrameUrl,
-      tail_image_url: endFrameUrl,
-      aspect_ratio:   aspectRatio,
-      duration:       parseInt(duration),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+  // Template: prompt fetched from DB via RPC — no client prompt needed
+  async template_office_handover(params, settings, provider) {
+    const { data: prompt } = await supabase.rpc('get_active_prompt', {
+      p_template_slug: 'office-handover',
+    })
+    return handlers.start_end_frame({ ...params, prompt: prompt || '' }, settings, provider)
   },
 
-  template_memory_lane: async ({ imageUrls, aspectRatio, duration, templatePrompt }) => {
-    const result = await runModel('kling_2_5', {
-      prompt:         templatePrompt,
-      image_url:      imageUrls[0],
-      tail_image_url: imageUrls[imageUrls.length - 1],
-      aspect_ratio:   aspectRatio,
-      duration:       Math.min(parseInt(duration) * imageUrls.length, 15),
-    }, provider)
-    return { outputUrl: extractVideoUrl(result), outputType: 'video', provider: result.provider }
+  async template_memory_lane({ imageUrls, aspectRatio = '9:16', duration = '5', model }, settings, provider) {
+    const { data: prompt } = await supabase.rpc('get_active_prompt', {
+      p_template_slug: 'memory-lane',
+    })
+    return handlers.start_end_frame({
+      prompt:        prompt || '',
+      startFrameUrl: imageUrls[0],
+      endFrameUrl:   imageUrls[imageUrls.length - 1],
+      aspectRatio,
+      duration,
+      model,
+    }, settings, provider)
   },
-})
+}
 
-// ── Main handler ───────────────────────────────────────────
+// ── Main handler ──────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { action, ...payload } = req.body
+  const { action, provider: reqProvider, ...params } = req.body
 
-  if (!action) {
-    return res.status(400).json({ error: 'Missing action' })
+  if (!action) return res.status(400).json({ error: 'Missing action' })
+
+  const fn = handlers[action]
+  if (!fn)  return res.status(400).json({ error: `Unknown action: ${action}` })
+
+  // Load settings — degrade gracefully if DB is unreachable
+  let settings = {}
+  let provider = 'fal'
+  try {
+    settings = await getSettings()
+    provider = reqProvider || settings.active_provider || 'fal'
+  } catch (err) {
+    console.warn('[generate] Settings fetch failed, defaulting to fal:', err.message)
   }
 
+  const fallback = provider === 'wavespeed' ? 'fal' : 'wavespeed'
+
+  // Try primary provider
   try {
-    const settings = await getSettings()
-    const provider = settings.active_provider || 'fal'
-    const handlers = buildHandlers(settings, provider)
+    const result = await fn(params, settings, provider)
+    return res.status(200).json({ ...result, provider })
+  } catch (primaryErr) {
+    console.warn(`[generate] ${provider} failed for "${action}": ${primaryErr.message} — trying ${fallback}`)
+  }
 
-    if (!handlers[action]) {
-      return res.status(400).json({ error: `Unknown action: ${action}` })
-    }
-
-    const result = await handlers[action](payload)
-
-    if (!result?.outputUrl) {
-      throw new Error(`Generation succeeded but returned no output URL (provider: ${result?.provider || provider})`)
-    }
-
-    return res.status(200).json(result)
-
-  } catch (error) {
-    console.error(`[generate] action=${action} error:`, error.message)
-    return res.status(500).json({ error: error.message || 'Generation failed' })
+  // Try fallback provider
+  try {
+    const result = await fn(params, settings, fallback)
+    return res.status(200).json({ ...result, provider: fallback, _fallback: true })
+  } catch (fallbackErr) {
+    console.error(`[generate] Both providers failed for "${action}". Fallback: ${fallbackErr.message}`)
+    return res.status(500).json({
+      error:    'Generation failed on both providers. Please try again.',
+      provider,
+      fallback,
+    })
   }
 }
