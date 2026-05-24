@@ -56,7 +56,6 @@ export default function AuthPage() {
   const [loading,     setLoading]     = useState(false)
   const [errors,      setErrors]      = useState({})
 
-  // ── Google OAuth return: user exists but needs onboarding ─
   useEffect(() => {
     if (user && onboardingNeeded) setView(VIEWS.SET_PROFILE)
   }, [user, onboardingNeeded])
@@ -64,7 +63,6 @@ export default function AuthPage() {
   const clearErrors = () => setErrors({})
   const back = () => { clearErrors(); setView(BACK_MAP[view] ?? VIEWS.LANDING) }
 
-  // ── Signup: Send OTP ──────────────────────────────────────
   const handleSendOTP = async () => {
     clearErrors()
     if (!email)                       return setErrors({ email: 'Email is required' })
@@ -80,9 +78,6 @@ export default function AuthPage() {
     setView(VIEWS.OTP_VERIFY)
   }
 
-  // ── Signup: Verify OTP ────────────────────────────────────
-  // auth.verifyOTP must sign the user in (establish a session),
-  // not just verify — auth.updatePassword in the next step depends on it.
   const handleVerifyOTP = async () => {
     clearErrors()
     if (otp.length < 8) return setErrors({ otp: 'Enter the complete 8-digit code' })
@@ -96,7 +91,6 @@ export default function AuthPage() {
     setView(VIEWS.SET_PASSWORD)
   }
 
-  // ── Signup: Set Password ──────────────────────────────────
   const handleSetPassword = async () => {
     clearErrors()
     const errs = {}
@@ -114,8 +108,6 @@ export default function AuthPage() {
     setView(VIEWS.SET_PROFILE)
   }
 
-  // ── Signup: Set Profile ───────────────────────────────────
-  // Uses user from AuthContext — reliable after OTP verify or Google sign-in.
   const handleSetProfile = async () => {
     clearErrors()
     const errs = {}
@@ -144,7 +136,6 @@ export default function AuthPage() {
     navigate('/create')
   }
 
-  // ── Login ─────────────────────────────────────────────────
   const handleLogin = async () => {
     clearErrors()
     const errs = {}
@@ -160,14 +151,11 @@ export default function AuthPage() {
     navigate('/create')
   }
 
-  // ── Google Auth ───────────────────────────────────────────
   const handleGoogleAuth = async () => {
     const { error } = await auth.signInWithGoogle()
     if (error) toast.error('Google sign in failed')
-    // Navigation handled by OAuth redirect → AuthCallbackPage → AuthContext
   }
 
-  // ── Forgot Password ───────────────────────────────────────
   const handleForgotPassword = async () => {
     clearErrors()
     if (!email) return setErrors({ email: 'Enter your email address' })
@@ -237,7 +225,7 @@ export default function AuthPage() {
                 </div>
                 <h1
                   className="text-4xl font-black"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   Meckury
                 </h1>
@@ -272,8 +260,7 @@ export default function AuthPage() {
             <motion.div key="email" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Create account
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>
@@ -307,8 +294,7 @@ export default function AuthPage() {
             <motion.div key="otp" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Check your email
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>
@@ -351,8 +337,7 @@ export default function AuthPage() {
             <motion.div key="set-password" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Set a password
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>Choose a strong password to secure your account</p>
@@ -382,8 +367,7 @@ export default function AuthPage() {
             <motion.div key="profile" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Set up profile
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>Almost there! Choose your username</p>
@@ -413,8 +397,7 @@ export default function AuthPage() {
             <motion.div key="login" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Welcome back
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>Sign in to your account</p>
@@ -459,8 +442,7 @@ export default function AuthPage() {
             <motion.div key="forgot" {...slideIn} className="flex flex-col flex-1">
               <BackButton />
               <div className="mb-8">
-                <h2 className="text-3xl font-black mb-2"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <h2 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
                   Reset password
                 </h2>
                 <p style={{ color: 'var(--text-muted)' }}>Enter your email and we'll send a reset link</p>
@@ -492,8 +474,7 @@ export default function AuthPage() {
               >
                 <Mail size={36} style={{ color: 'var(--brand)' }} />
               </div>
-              <h2 className="text-2xl font-black mb-3"
-                style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+              <h2 className="text-2xl font-black mb-3" style={{ color: 'var(--text-primary)' }}>
                 Check your email
               </h2>
               <p className="mb-8" style={{ color: 'var(--text-muted)' }}>
