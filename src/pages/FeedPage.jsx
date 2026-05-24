@@ -48,10 +48,7 @@ const VideoModal = ({ url, onClose }) => {
           <video
             ref={videoRef}
             src={url}
-            controls
-            autoPlay
-            playsInline
-            loop
+            controls autoPlay playsInline loop
             className="w-full rounded-3xl"
             style={{ background: '#000', maxHeight: '80vh', objectFit: 'contain' }}
           />
@@ -61,7 +58,7 @@ const VideoModal = ({ url, onClose }) => {
   )
 }
 
-// ─── Template Discover Card (horizontal scroll strip) ─────
+// ─── Template Discover Card ───────────────────────────────
 
 const TemplateDiscoverCard = ({ template, index, onUse }) => {
   const creditLabel = template.credit_cost_per_image
@@ -76,13 +73,8 @@ const TemplateDiscoverCard = ({ template, index, onUse }) => {
       whileTap={{ scale: 0.96 }}
       onClick={() => onUse(template)}
       className="flex-shrink-0 w-40 rounded-3xl overflow-hidden text-left"
-      style={{
-        background: 'var(--bg-card)',
-        border:     '1px solid var(--border)',
-        boxShadow:  'var(--shadow)',
-      }}
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
-      {/* Thumbnail */}
       <div
         className="h-24 w-full relative flex items-center justify-center"
         style={{
@@ -92,18 +84,14 @@ const TemplateDiscoverCard = ({ template, index, onUse }) => {
         }}
       >
         {template.thumbnail_url ? (
-          <img
-            src={template.thumbnail_url}
-            alt={template.name}
-            className="w-full h-full object-cover"
-          />
+          <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
         ) : (
           <Sparkles size={28} style={{ color: 'var(--brand)', opacity: 0.5 }} />
         )}
 
         {template.is_featured && (
           <div
-            className="absolute top-2 left-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-bold"
+            className="absolute top-2 left-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full font-bold"
             style={{ background: 'var(--brand)', color: 'white', fontSize: '9px' }}
           >
             <Star size={8} fill="white" />
@@ -112,19 +100,15 @@ const TemplateDiscoverCard = ({ template, index, onUse }) => {
         )}
 
         <div
-          className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full text-xs font-bold"
+          className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full font-bold"
           style={{ background: 'rgba(0,0,0,0.55)', color: 'white', backdropFilter: 'blur(4px)', fontSize: '9px' }}
         >
           ⚡ {creditLabel}
         </div>
       </div>
 
-      {/* Name + arrow */}
       <div className="px-3 py-2.5 flex items-center justify-between">
-        <p
-          className="text-xs font-bold leading-tight flex-1 mr-1"
-          style={{ color: 'var(--text-primary)' }}
-        >
+        <p className="text-xs font-bold leading-tight flex-1 mr-1" style={{ color: 'var(--text-primary)' }}>
           {template.name}
         </p>
         <ArrowRight size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />
@@ -217,17 +201,17 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
 const PAGE_SIZE = 20
 
 export default function FeedPage() {
-  const navigate                      = useNavigate()
-  const { user }                      = useAuth()
-  const [posts, setPosts]             = useState([])
-  const [publicTemplates, setPublicTemplates] = useState([])
-  const [templatesLoading, setTemplatesLoading] = useState(true)
-  const [loading, setLoading]         = useState(true)
-  const [likedPosts, setLikedPosts]   = useState(new Set())
-  const [page, setPage]               = useState(0)
-  const [hasMore, setHasMore]         = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [activeVideo, setActiveVideo] = useState(null)
+  const navigate                            = useNavigate()
+  const { user }                            = useAuth()
+  const [posts,             setPosts]             = useState([])
+  const [publicTemplates,   setPublicTemplates]   = useState([])
+  const [templatesLoading,  setTemplatesLoading]  = useState(true)
+  const [loading,           setLoading]           = useState(true)
+  const [likedPosts,        setLikedPosts]        = useState(new Set())
+  const [page,              setPage]              = useState(0)
+  const [hasMore,           setHasMore]           = useState(true)
+  const [loadingMore,       setLoadingMore]       = useState(false)
+  const [activeVideo,       setActiveVideo]       = useState(null)
 
   useEffect(() => {
     const loadTemplates = async () => {
@@ -266,7 +250,6 @@ export default function FeedPage() {
 
   const handleLike = async (postId) => {
     if (!user) return toast.error('Sign in to like posts')
-
     const wasLiked = likedPosts.has(postId)
     setLikedPosts((prev) => {
       const next = new Set(prev)
@@ -280,7 +263,6 @@ export default function FeedPage() {
           : p
       )
     )
-
     const { data } = await feedDb.toggleLike(user.id, postId)
     if (!data?.success) {
       setLikedPosts((prev) => {
@@ -325,12 +307,8 @@ export default function FeedPage() {
       <TopBar showLogo showCredits />
       <PageWrapper>
 
-        {/* ── Page heading ─────────────────────────────────── */}
         <div className="pt-2 pb-5">
-          <h1
-            className="text-2xl font-black"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
             Discover
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -338,14 +316,11 @@ export default function FeedPage() {
           </p>
         </div>
 
-        {/* ── Public Templates discovery strip ─────────────── */}
+        {/* Public Templates strip */}
         {(templatesLoading || publicTemplates.length > 0) && (
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <p
-                className="text-xs font-bold uppercase tracking-wider"
-                style={{ color: 'var(--text-secondary)' }}
-              >
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-secondary)' }}>
                 ✦ Templates
               </p>
               <button
@@ -382,19 +357,16 @@ export default function FeedPage() {
           </div>
         )}
 
-        {/* ── Divider ───────────────────────────────────────── */}
+        {/* Divider */}
         <div className="flex items-center gap-3 mb-5">
           <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-          <p
-            className="text-xs font-bold uppercase tracking-wider"
-            style={{ color: 'var(--text-muted)' }}
-          >
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
             Community Feed
           </p>
           <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
         </div>
 
-        {/* ── Community feed grid ───────────────────────────── */}
+        {/* Feed grid */}
         {loading ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -426,8 +398,12 @@ export default function FeedPage() {
                 <button
                   onClick={handleLoadMore}
                   disabled={loadingMore}
-                  className="px-6 py-3 rounded-2xl text-sm font-semibold transition-colors"
-                  style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
+                  className="px-6 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    color:      'var(--text-secondary)',
+                    border:     '1px solid var(--border)',
+                  }}
                 >
                   {loadingMore ? 'Loading…' : 'Load more'}
                 </button>
