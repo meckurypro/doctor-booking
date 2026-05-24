@@ -41,7 +41,7 @@ const AuthCallbackPage = () => {
 
   useEffect(() => {
     if (!loading) {
-      navigate(user ? '/create' : '/auth', { replace: true })
+      navigate(user ? '/feed' : '/auth', { replace: true })
     }
   }, [loading, user, navigate])
 
@@ -96,16 +96,16 @@ const AppRoutes = () => {
       {/* Public */}
       <Route
         path="/"
-        element={user ? <Navigate to="/create" replace /> : <LandingPage />}
+        element={user ? <Navigate to="/feed" replace /> : <LandingPage />}
       />
       <Route
         path="/auth"
-        element={user ? <Navigate to="/create" replace /> : <AuthPage />}
+        element={user ? <Navigate to="/feed" replace /> : <AuthPage />}
       />
       <Route path="/auth/callback"        element={<AuthCallbackPage />} />
       <Route path="/auth/reset-password"  element={<ResetPasswordPage />} />
 
-      {/* Protected */}
+      {/* Protected — default landing after login is /feed (Discover) */}
       <Route path="/feed" element={
         <ProtectedRoute><AppLayout><FeedPage /></AppLayout></ProtectedRoute>
       } />
@@ -136,7 +136,7 @@ const AppRoutes = () => {
       {/* Fallback */}
       <Route
         path="*"
-        element={<Navigate to={user ? '/create' : '/'} replace />}
+        element={<Navigate to={user ? '/feed' : '/'} replace />}
       />
     </Routes>
   )
