@@ -1,27 +1,38 @@
 /* src/index.css */
 
+/* ============================================================
+   FONTS — Google Fonts
+   Syne: display headings (bold, geometric)
+   DM Sans: body text (clean, readable)
+   JetBrains Mono: code / prompt text
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ============================================================
    CSS CUSTOM PROPERTIES — THEME SYSTEM
+   Inspired by Kling AI / Hailuo: deep blacks, subtle surfaces,
+   orange brand, cinematic feel.
    ============================================================ */
 
 :root {
-  /* Light theme */
-  --bg-primary:  #f7f5f2;
-  --bg-secondary: #f0ede8;
-  --bg-card:     #ffffff;
-  --bg-elevated: #eeebe6;
-  --bg-input:    #f0ede8;
+  /* ── Light theme — warm near-white, not blinding white ── */
+  --bg-primary:   #f5f3f0;
+  --bg-secondary: #eeebe6;
+  --bg-card:      #ffffff;
+  --bg-elevated:  #e8e5e0;
+  --bg-input:     #f0ede8;
 
-  --text-primary:   #0a0905;
-  --text-secondary: #4a4540;
-  --text-muted:     #9c9590;
+  --text-primary:   #0d0b08;
+  --text-secondary: #3d3830;
+  --text-muted:     #8a837a;
   --text-inverse:   #ffffff;
 
-  --border:       #e2ddd8;
+  --border:       #ddd9d4;
   --border-focus: #f97316;
 
   --brand:       #f97316;
@@ -37,28 +48,28 @@
 }
 
 .dark {
-  /* Dark theme */
-  --bg-primary:  #0a0a0a;
-  --bg-secondary: #111111;
-  --bg-card:     #141414;
-  --bg-elevated: #1c1c1c;
-  --bg-input:    #1a1a1a;
+  /* ── Dark theme — Kling/Hailuo-inspired: true black, deep surfaces ── */
+  --bg-primary:   #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-card:      #111111;
+  --bg-elevated:  #1a1a1a;
+  --bg-input:     #161616;
 
-  --text-primary:   #fafafa;
-  --text-secondary: #a3a3a3;
-  --text-muted:     #525252;
-  --text-inverse:   #0a0a0a;
+  --text-primary:   #f5f5f5;
+  --text-secondary: #a8a8a8;
+  --text-muted:     #4a4a4a;
+  --text-inverse:   #000000;
 
-  --border:       #262626;
+  --border:       #222222;
   --border-focus: #f97316;
 
   --brand:       #f97316;
   --brand-light: #431407;
   --brand-dark:  #fb923c;
 
-  --shadow:    0 1px 3px rgba(0,0,0,0.4),  0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3);
-  --shadow-lg: 0 10px 30px rgba(0,0,0,0.5), 0 4px 8px rgba(0,0,0,0.4);
+  --shadow:    0 1px 3px rgba(0,0,0,0.6),  0 1px 2px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.5);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.7), 0 4px 8px rgba(0,0,0,0.6);
 }
 
 /* ============================================================
@@ -73,11 +84,10 @@
 }
 
 html {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing:  antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
-  /* Prevent layout shift when scrollbar appears */
   scrollbar-gutter: stable;
 }
 
@@ -88,8 +98,6 @@ body {
   color: var(--text-primary);
   min-height: 100dvh;
   overflow-x: hidden;
-  /* Only transition on theme toggle, not on load.
-     ThemeContext adds .dark synchronously so this is safe. */
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
@@ -104,7 +112,7 @@ body {
    ============================================================ */
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Syne', -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
@@ -178,9 +186,9 @@ img, video {
    TYPOGRAPHY UTILITIES
    ============================================================ */
 
-.font-display { font-family: 'Syne',           sans-serif;  }
-.font-body    { font-family: 'DM Sans',         sans-serif;  }
-.font-mono    { font-family: 'JetBrains Mono',  monospace;   }
+.font-display { font-family: 'Syne',          -apple-system, sans-serif; }
+.font-body    { font-family: 'DM Sans',        -apple-system, sans-serif; }
+.font-mono    { font-family: 'JetBrains Mono', 'Courier New', monospace;  }
 
 /* ============================================================
    BRAND
@@ -205,14 +213,14 @@ img, video {
    ============================================================ */
 
 .glass {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 .dark .glass {
-  background: rgba(0,0,0,0.3);
+  background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
 }
 
@@ -262,7 +270,7 @@ img, video {
 
 .input-base:focus {
   border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.12);
 }
 
 .input-base:disabled {
@@ -291,7 +299,23 @@ img, video {
   border-radius: 4px;
 }
 
-/* Remove focus ring for mouse users */
 :focus:not(:focus-visible) {
   outline: none;
+}
+
+/* ============================================================
+   CINEMATIC GLOW UTILITIES
+   For hero sections, featured cards, etc.
+   ============================================================ */
+
+.glow-brand {
+  box-shadow:
+    0 0 20px rgba(249,115,22,0.15),
+    0 0 60px rgba(249,115,22,0.08);
+}
+
+.dark .glow-brand {
+  box-shadow:
+    0 0 20px rgba(249,115,22,0.25),
+    0 0 60px rgba(249,115,22,0.12);
 }
