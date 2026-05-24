@@ -5,7 +5,6 @@ import { ArrowLeft, Moon, Sun, Monitor, Lock, User, ChevronRight, Shield } from 
 import { auth, profiles } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
-import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
@@ -16,7 +15,7 @@ const Section = ({ title, children }) => (
   <div className="mb-6">
     <p
       className="text-xs font-bold uppercase tracking-widest mb-3 px-1"
-      style={{ color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif' }}
+      style={{ color: 'var(--text-muted)' }}
     >
       {title}
     </p>
@@ -40,7 +39,7 @@ const SettingRow = ({ icon: Icon, label, value, onClick, danger = false }) => (
     </div>
     <span
       className="flex-1 text-sm font-medium"
-      style={{ fontFamily: 'DM Sans, sans-serif', color: danger ? '#ef4444' : 'var(--text-primary)' }}
+      style={{ color: danger ? '#ef4444' : 'var(--text-primary)' }}
     >
       {label}
     </span>
@@ -52,28 +51,26 @@ const SettingRow = ({ icon: Icon, label, value, onClick, danger = false }) => (
 // ─── Settings Page ────────────────────────────────────────
 
 export default function SettingsPage() {
-  const navigate                        = useNavigate()
+  const navigate                              = useNavigate()
   const { user, profile, updateProfileLocal } = useAuth()
-  const { theme, setTheme }             = useTheme()
+  const { theme, setTheme }                   = useTheme()
 
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [showEditProfile,    setShowEditProfile]    = useState(false)
 
-  // Password state
   const [newPass,     setNewPass]     = useState('')
   const [confirmPass, setConfirmPass] = useState('')
   const [passLoading, setPassLoading] = useState(false)
   const [passErrors,  setPassErrors]  = useState({})
 
-  // Profile state
   const [displayName,    setDisplayName]    = useState(profile?.display_name || '')
   const [bio,            setBio]            = useState(profile?.bio || '')
   const [profileLoading, setProfileLoading] = useState(false)
 
   const handleChangePassword = async () => {
     const errors = {}
-    if (!newPass)                errs.newPass     = 'Required'
-    else if (newPass.length < 8) errors.newPass   = 'At least 8 characters'
+    if (!newPass)                errors.newPass     = 'Required'
+    else if (newPass.length < 8) errors.newPass     = 'At least 8 characters'
     if (newPass !== confirmPass) errors.confirmPass = 'Passwords do not match'
     if (Object.keys(errors).length > 0) return setPassErrors(errors)
 
@@ -96,7 +93,6 @@ export default function SettingsPage() {
 
     if (error) { toast.error('Failed to update profile'); return }
 
-    // updateProfileLocal must be exported from AuthContext
     updateProfileLocal(data)
     toast.success('Profile updated!')
     setShowEditProfile(false)
@@ -109,10 +105,11 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="page-container min-h-dvh" style={{ background: 'var(--bg-primary)' }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+
       {/* Header */}
       <div
-        className="sticky top-0 z-40 flex items-center gap-3 px-4 h-14"
+        className="flex-shrink-0 flex items-center gap-3 px-6 h-14"
         style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
       >
         <button
@@ -123,12 +120,13 @@ export default function SettingsPage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-base font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+        <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
           Settings
         </h1>
       </div>
 
-      <div className="px-4 py-5 pb-24">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-6 py-5 pb-24">
 
         {/* Appearance */}
         <Section title="Appearance">
@@ -141,9 +139,8 @@ export default function SettingsPage() {
                   onClick={() => setTheme(value)}
                   className="flex-1 flex flex-col items-center gap-2 py-3 rounded-2xl transition-all text-sm font-semibold"
                   style={{
-                    background: theme === value ? 'var(--brand)' : 'var(--bg-elevated)',
-                    color:      theme === value ? 'white' : 'var(--text-secondary)',
-                    fontFamily: 'Syne, sans-serif',
+                    background: theme === value ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                    color:      theme === value ? 'var(--text-inverse)' : 'var(--text-secondary)',
                   }}
                 >
                   <Icon size={18} />
@@ -201,9 +198,18 @@ export default function SettingsPage() {
             placeholder="Repeat new password" icon={Lock}
             error={passErrors.confirmPass}
           />
-          <Button onClick={handleChangePassword} loading={passLoading} variant="primary" size="lg" fullWidth>
-            Update password
-          </Button>
+          <button
+            onClick={handleChangePassword}
+            disabled={passLoading}
+            className="w-full py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
+            style={{
+              background: 'var(--text-primary)',
+              color:      'var(--text-inverse)',
+              opacity:    passLoading ? 0.6 : 1,
+            }}
+          >
+            {passLoading ? 'Updating…' : 'Update password'}
+          </button>
         </div>
       </Modal>
 
@@ -226,9 +232,18 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-right mt-1" style={{ color: 'var(--text-muted)' }}>{bio.length}/160</p>
           </div>
-          <Button onClick={handleUpdateProfile} loading={profileLoading} variant="primary" size="lg" fullWidth>
-            Save changes
-          </Button>
+          <button
+            onClick={handleUpdateProfile}
+            disabled={profileLoading}
+            className="w-full py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
+            style={{
+              background: 'var(--text-primary)',
+              color:      'var(--text-inverse)',
+              opacity:    profileLoading ? 0.6 : 1,
+            }}
+          >
+            {profileLoading ? 'Saving…' : 'Save changes'}
+          </button>
         </div>
       </Modal>
     </div>
