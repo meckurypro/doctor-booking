@@ -38,7 +38,7 @@ const TOOLS = [
     icon:        Film,
     color:       '#f97316',
     bg:          'rgba(249,115,22,0.12)',
-    credits:     3,        // 5s base; up to 5 for 10s
+    credits:     3,
   },
   {
     id:          'image_to_video',
@@ -47,7 +47,7 @@ const TOOLS = [
     icon:        Sparkles,
     color:       '#10b981',
     bg:          'rgba(16,185,129,0.12)',
-    credits:     2,        // 5s base
+    credits:     2,
   },
   {
     id:          'start_end_frame',
@@ -56,7 +56,7 @@ const TOOLS = [
     icon:        Layers,
     color:       '#f43f5e',
     bg:          'rgba(244,63,94,0.12)',
-    credits:     2,        // 5s base
+    credits:     2,
   },
   {
     id:          'end_frame_text',
@@ -65,7 +65,7 @@ const TOOLS = [
     icon:        Film,
     color:       '#eab308',
     bg:          'rgba(234,179,8,0.12)',
-    credits:     2,        // 5s base
+    credits:     2,
   },
 ]
 
@@ -131,7 +131,7 @@ export default function CreatePage() {
         <div className="pt-2 pb-6">
           <h1
             className="text-2xl font-black"
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             Create
           </h1>
@@ -176,7 +176,6 @@ export default function CreatePage() {
                 background: activeTab === tab ? 'var(--bg-card)' : 'transparent',
                 color:      activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
                 boxShadow:  activeTab === tab ? 'var(--shadow)' : 'none',
-                fontFamily: 'Syne, sans-serif',
               }}
             >
               {tab === 'smart' ? '✦ AI' : tab}
@@ -200,7 +199,6 @@ export default function CreatePage() {
             </div>
             <SmartPromptInput
               onConfirm={(data) => {
-                // Route to GeneratePage with AI-resolved parameters
                 navigate('/generate', {
                   state: {
                     type:           data.templateSlug ? 'template' : data.type,
@@ -279,7 +277,6 @@ export default function CreatePage() {
                         style={{
                           background: 'var(--brand)',
                           color: 'white',
-                          fontFamily: 'Syne, sans-serif',
                         }}
                       >
                         <Star size={10} fill="white" />
@@ -292,7 +289,6 @@ export default function CreatePage() {
                       style={{
                         background:    'rgba(0,0,0,0.5)',
                         color:         'white',
-                        fontFamily:    'Syne, sans-serif',
                         backdropFilter: 'blur(8px)',
                       }}
                     >
@@ -308,7 +304,7 @@ export default function CreatePage() {
                     <div>
                       <h3
                         className="font-bold text-base"
-                        style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+                        style={{ color: 'var(--text-primary)' }}
                       >
                         {template.name}
                       </h3>
@@ -364,7 +360,7 @@ export default function CreatePage() {
                 </div>
                 <h3
                   className="font-bold text-sm leading-tight mb-1"
-                  style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 >
                   {tool.label}
                 </h3>
