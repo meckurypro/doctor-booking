@@ -1,6 +1,6 @@
 // src/pages/AuthPage.jsx
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-motion'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, User, Zap } from 'lucide-react'
 import { auth, profiles } from '@/lib/supabase'
