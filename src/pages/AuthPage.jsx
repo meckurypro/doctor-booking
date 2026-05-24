@@ -1,5 +1,5 @@
 // src/pages/AuthPage.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, User, Zap } from 'lucide-react'
@@ -42,7 +42,7 @@ const slideIn = { initial: { opacity: 0, x: 30 },      animate: { opacity: 1, x:
 const fadeIn  = { initial: { opacity: 0, y: 20 },       animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -20 } }
 const scaleIn = { initial: { opacity: 0, scale: 0.95 }, animate: { opacity: 1, scale: 1 } }
 
-// ── Reel slideshow (right panel, desktop only) ─────────────
+// ── Reel slideshow ─────────────────────────────────────────
 const ReelSlideshow = () => {
   const [current, setCurrent] = useState(0)
 
@@ -71,15 +71,16 @@ const ReelSlideshow = () => {
         />
       </AnimatePresence>
 
-      {/* Bottom overlay */}
       <div
         className="absolute inset-0"
         style={{ background: 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.7) 100%)' }}
       />
 
-      {/* Label */}
       <div className="absolute bottom-0 left-0 right-0 p-10">
-        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <p
+          className="text-xs font-semibold uppercase tracking-widest mb-2"
+          style={{ color: 'rgba(255,255,255,0.5)' }}
+        >
           Made with Meckury AI
         </p>
         <AnimatePresence mode="wait">
@@ -89,7 +90,7 @@ const ReelSlideshow = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.4 }}
-            className="text-white text-2xl font-black tracking-tight"
+            className="text-white text-2xl font-black"
             style={{ letterSpacing: '-0.03em' }}
           >
             {item.label}
@@ -97,8 +98,7 @@ const ReelSlideshow = () => {
         </AnimatePresence>
       </div>
 
-      {/* Dot indicators */}
-      <div className="absolute bottom-10 right-10 flex gap-1.5">
+      <div className="absolute bottom-10 right-10 flex gap-1.5 items-center">
         {REEL_ITEMS.map((_, i) => (
           <button
             key={i}
@@ -223,7 +223,7 @@ export default function AuthPage() {
     setView(VIEWS.RESET_SENT)
   }
 
-  // ── Reusable button components ────────────────────────────
+  // ── Button primitives ─────────────────────────────────────
   const PrimaryButton = ({ onClick, children }) => (
     <button
       onClick={onClick}
@@ -294,14 +294,17 @@ export default function AuthPage() {
     ) : null
 
   return (
+    // ── Root: full viewport, no scroll ────────────────────
     <div
-      className="min-h-dvh flex"
+      className="h-dvh flex overflow-hidden"
       style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
     >
-      {/* ── LEFT: form panel ──────────────────────────────── */}
-      <div className="flex flex-col w-full lg:w-[480px] xl:w-[520px] flex-shrink-0">
-
-        {/* Header */}
+      {/* ── LEFT: form panel ────────────────────────────── */}
+      <div
+        className="flex flex-col w-full lg:w-[480px] xl:w-[520px] flex-shrink-0 h-full"
+        style={{ borderRight: '1px solid var(--border)' }}
+      >
+        {/* Header — fixed height */}
         <div
           className="flex items-center px-8 h-14 flex-shrink-0"
           style={{ borderBottom: '1px solid var(--border)' }}
@@ -320,8 +323,8 @@ export default function AuthPage() {
           </div>
         </div>
 
-        {/* Form area */}
-        <div className="flex flex-col flex-1 justify-center px-8 py-12">
+        {/* Form area — scrollable if content overflows */}
+        <div className="flex flex-col flex-1 justify-center px-8 py-10 overflow-y-auto">
           <AnimatePresence mode="wait">
 
             {/* Landing */}
@@ -574,9 +577,9 @@ export default function AuthPage() {
           </AnimatePresence>
         </div>
 
-        {/* Footer */}
+        {/* Footer — fixed to bottom, never scrolls */}
         <div
-          className="px-8 py-5 flex items-center justify-between flex-shrink-0"
+          className="flex-shrink-0 px-8 py-5 flex items-center justify-between"
           style={{ borderTop: '1px solid var(--border)' }}
         >
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>By LinkAI</p>
@@ -588,7 +591,7 @@ export default function AuthPage() {
       </div>
 
       {/* ── RIGHT: reel slideshow (desktop only) ─────────── */}
-      <div className="hidden lg:block flex-1 relative">
+      <div className="hidden lg:block flex-1 h-full">
         <ReelSlideshow />
       </div>
     </div>
