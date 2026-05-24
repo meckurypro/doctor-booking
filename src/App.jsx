@@ -36,33 +36,44 @@ const FullLoader = ({ size = 'md' }) => (
 )
 
 // ── OAuth Callback Handler ─────────────────────────────────
-// Must NOT be inside the loading gate — it needs to run
-// immediately when Supabase redirects back with ?code=...
-// If it's blocked by `if (loading) return <FullLoader />`,
-// the code expires before exchangeCodeForSession is called
-// and no user is ever created.
+// Declared BEFORE the loading gate so it always mounts and
+// runs immediately when Supabase redirects back with ?code=
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
     const handle = async () => {
-      const hasCode = new URLSearchParams(window.location.search).has('code')
+      const fullUrl = window.location.href
+      const search  = window.location.search
+      const hash    = window.location.hash
+      const hasCode = new URLSearchParams(search).has('code')
+
+      console.log('[AuthCallback] full URL   :', fullUrl)
+      console.log('[AuthCallback] search     :', search)
+      console.log('[AuthCallback] hash       :', hash)
+      console.log('[AuthCallback] hasCode    :', hasCode)
 
       if (hasCode) {
-        const { error } = await supabase.auth.exchangeCodeForSession(
-          window.location.href,
-        )
+        const { data, error } = await supabase.auth.exchangeCodeForSession(fullUrl)
+        console.log('[AuthCallback] exchange data :', data)
+        console.log('[AuthCallback] exchange error:', error)
+
         if (error) {
-          console.error('AuthCallback: exchangeCodeForSession failed', error)
+          console.error('[AuthCallback] exchangeCodeForSession failed', error)
           navigate('/auth?error=oauth_failed', { replace: true })
           return
         }
+
+        // Success — session is established, navigate to /auth.
+        // AuthContext picks up the session via onAuthStateChange
+        // and AuthPage redirects to /feed automatically.
+        navigate('/auth', { replace: true })
+        return
       }
 
-      // Session is now established. Navigate to /auth — AuthContext will
-      // pick up the session via onAuthStateChange and AuthPage will either
-      // redirect to /feed (existing user) or show SET_PROFILE (new user).
+      // No code in URL — could be a direct hit or stale redirect
+      console.warn('[AuthCallback] No ?code= param found in URL')
       navigate('/auth', { replace: true })
     }
 
@@ -106,9 +117,6 @@ const AppLayout = ({ children }) => (
 )
 
 // ── Route Definitions ──────────────────────────────────────
-// IMPORTANT: /auth/callback and /auth/reset-password are declared
-// BEFORE the loading gate so they always mount and run their
-// useEffect regardless of auth loading state.
 
 const AppRoutes = () => {
   const { user, loading } = useAuth()
