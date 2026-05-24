@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Modal'
 import { SmartPromptInput } from '@/components/ui/SmartPromptInput'
 import { useAuth } from '@/context/AuthContext'
 
-// ─── Tools (credit costs match README) ────────────────────
+// ─── Tools ────────────────────────────────────────────────
 
 const TOOLS = [
   {
@@ -69,8 +69,6 @@ const TOOLS = [
   },
 ]
 
-// ─── Type labels for Smart tab routing ────────────────────
-
 const TYPE_LABELS = {
   text_to_image:   'Text to Image',
   image_to_image:  'Image to Image',
@@ -80,17 +78,16 @@ const TYPE_LABELS = {
   end_frame_text:  'End Frame + Text',
 }
 
-// ─── Low credits threshold ─────────────────────────────────
 const LOW_CREDIT_THRESHOLD = 3
 
 // ─── Create Page ──────────────────────────────────────────
 
 export default function CreatePage() {
-  const navigate          = useNavigate()
-  const { credits }       = useAuth()
-  const [activeTab, setActiveTab] = useState('smart')
-  const [templates, setTemplates] = useState([])
-  const [loading, setLoading]     = useState(true)
+  const navigate                  = useNavigate()
+  const { credits }               = useAuth()
+  const [activeTab,  setActiveTab]  = useState('smart')
+  const [templates,  setTemplates]  = useState([])
+  const [loading,    setLoading]    = useState(true)
 
   const isLowCredits = credits < LOW_CREDIT_THRESHOLD
 
@@ -127,12 +124,9 @@ export default function CreatePage() {
     <>
       <TopBar showLogo showCredits />
       <PageWrapper>
-        {/* Greeting */}
+
         <div className="pt-2 pb-6">
-          <h1
-            className="text-2xl font-black"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
             Create
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -144,18 +138,12 @@ export default function CreatePage() {
         {isLowCredits && (
           <div
             className="flex items-center gap-2 p-3 rounded-2xl mb-4"
-            style={{
-              background: 'rgba(234,179,8,0.08)',
-              border: '1px solid rgba(234,179,8,0.25)',
-            }}
+            style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)' }}
           >
             <Zap size={14} style={{ color: '#eab308', flexShrink: 0 }} />
             <p className="text-xs font-medium" style={{ color: '#eab308' }}>
               You're running low on credits.{' '}
-              <button
-                onClick={() => navigate('/profile')}
-                className="underline font-bold"
-              >
+              <button onClick={() => navigate('/profile')} className="underline font-bold">
                 Top up here
               </button>
             </p>
@@ -187,10 +175,7 @@ export default function CreatePage() {
         {activeTab === 'smart' && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <div className="mb-5">
-              <p
-                className="text-xs font-semibold mb-1 uppercase tracking-wide"
-                style={{ color: 'var(--brand)' }}
-              >
+              <p className="text-xs font-semibold mb-1 uppercase tracking-widest" style={{ color: 'var(--brand)' }}>
                 ✦ AI-powered
               </p>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -204,7 +189,7 @@ export default function CreatePage() {
                     type:           data.templateSlug ? 'template' : data.type,
                     templateSlug:   data.templateSlug || null,
                     templateName:   data.templateSlug
-                                      ? data.templateSlug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                                      ? data.templateSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
                                       : null,
                     toolLabel:      TYPE_LABELS[data.type] || 'AI Creation',
                     prompt:         data.enhanced_prompt,
@@ -246,13 +231,8 @@ export default function CreatePage() {
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleTemplateSelect(template)}
                   className="w-full rounded-3xl overflow-hidden text-left relative"
-                  style={{
-                    background:  'var(--bg-card)',
-                    border:      '1px solid var(--border)',
-                    boxShadow:   'var(--shadow-md)',
-                  }}
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
                 >
-                  {/* Thumbnail area */}
                   <div
                     className="h-36 w-full relative flex items-center justify-center"
                     style={{
@@ -262,11 +242,7 @@ export default function CreatePage() {
                     }}
                   >
                     {template.thumbnail_url ? (
-                      <img
-                        src={template.thumbnail_url}
-                        alt={template.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={template.thumbnail_url} alt={template.name} className="w-full h-full object-cover" />
                     ) : (
                       <Sparkles size={40} style={{ color: 'var(--brand)', opacity: 0.4 }} />
                     )}
@@ -274,10 +250,7 @@ export default function CreatePage() {
                     {template.is_featured && (
                       <div
                         className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold"
-                        style={{
-                          background: 'var(--brand)',
-                          color: 'white',
-                        }}
+                        style={{ background: 'var(--brand)', color: 'white' }}
                       >
                         <Star size={10} fill="white" />
                         Featured
@@ -286,11 +259,7 @@ export default function CreatePage() {
 
                     <div
                       className="absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-bold"
-                      style={{
-                        background:    'rgba(0,0,0,0.5)',
-                        color:         'white',
-                        backdropFilter: 'blur(8px)',
-                      }}
+                      style={{ background: 'rgba(0,0,0,0.5)', color: 'white', backdropFilter: 'blur(8px)' }}
                     >
                       ⚡{' '}
                       {template.credit_cost_per_image
@@ -299,13 +268,9 @@ export default function CreatePage() {
                     </div>
                   </div>
 
-                  {/* Info */}
                   <div className="p-4 flex items-center justify-between">
                     <div>
-                      <h3
-                        className="font-bold text-base"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
+                      <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
                         {template.name}
                       </h3>
                       <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -346,11 +311,7 @@ export default function CreatePage() {
                 whileTap={{ scale: 0.96 }}
                 onClick={() => handleToolSelect(tool)}
                 className="rounded-3xl p-4 text-left"
-                style={{
-                  background: 'var(--bg-card)',
-                  border:     '1px solid var(--border)',
-                  boxShadow:  'var(--shadow)',
-                }}
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
               >
                 <div
                   className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3"
@@ -358,10 +319,7 @@ export default function CreatePage() {
                 >
                   <tool.icon size={22} style={{ color: tool.color }} />
                 </div>
-                <h3
-                  className="font-bold text-sm leading-tight mb-1"
-                  style={{ color: 'var(--text-primary)' }}
-                >
+                <h3 className="font-bold text-sm leading-tight mb-1" style={{ color: 'var(--text-primary)' }}>
                   {tool.label}
                 </h3>
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
