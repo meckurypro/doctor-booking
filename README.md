@@ -63,43 +63,56 @@ meckury/
 │   ├── lib/
 │   │   ├── supabase.js        # Supabase client + all DB helpers
 │   │   ├── fal.js             # Generation client — proxies to /api/generate
+│   │   ├── wavespeed.js       # WaveSpeed client — proxies to /api/generate
+│   │   ├── provider.js        # Smart router — fal vs WaveSpeed from DB settings
+│   │   ├── creditUtils.js     # Credit cost calculations (single source of truth)
 │   │   └── paystack.js        # Paystack popup + verification
 │   │
 │   ├── context/
-│   │   ├── AuthContext.jsx    # Auth state, profile, credits
+│   │   ├── AuthContext.jsx    # Auth state, profile, credits, isStaff
 │   │   └── ThemeContext.jsx   # Dark/light/system theme
 │   │
 │   ├── hooks/
 │   │   ├── useAuth.js         # Re-export from AuthContext
 │   │   ├── useTheme.js        # Re-export from ThemeContext
 │   │   ├── useCredits.js      # Credit balance + transactions
-│   │   └── useGenerate.js     # Full generation pipeline
+│   │   └── useGenerate.js     # Full generation pipeline (staff pool support)
+│   │
+│   ├── templates/
+│   │   ├── index.js           # Template registry — import all templates here
+│   │   ├── office-handover.js # Office Handover template definition
+│   │   └── memory-lane.js     # Memory Lane template definition
 │   │
 │   ├── components/
 │   │   ├── ui/
-│   │   │   ├── Button.jsx     # Primary, secondary, ghost, danger
-│   │   │   ├── Input.jsx      # Input, OTPInput, Textarea
-│   │   │   ├── Modal.jsx      # Modal, Loader, Skeleton, CreditBadge, EmptyState
-│   │   │   └── ImageUpload.jsx # Single + multi image upload
+│   │   │   ├── Button.jsx          # Primary, secondary, ghost, danger
+│   │   │   ├── Input.jsx           # Input, OTPInput, Textarea
+│   │   │   ├── Modal.jsx           # Modal, Loader, Skeleton, CreditBadge, EmptyState
+│   │   │   ├── ImageUpload.jsx     # Single + multi image upload
+│   │   │   └── SmartPromptInput.jsx # AI-powered prompt resolver (Create page)
+│   │   ├── templates/
+│   │   │   ├── TemplateCard.jsx    # Reusable template card (compact + default variants)
+│   │   │   └── TemplateRunner.jsx  # Renders template UI from file definition
 │   │   ├── admin/
-│   │   │   └── ProviderSettings.jsx  # Admin toggle: provider + model selection
+│   │   │   └── ProviderSettings.jsx # Admin toggle: provider + model selection
 │   │   └── layout/
-│   │       ├── BottomNav.jsx  # 4-tab bottom navigation
-│   │       ├── TopBar.jsx     # Fixed top header with credits
-│   │       └── PageWrapper.jsx # Animated page container
+│   │       ├── BottomNav.jsx       # 4-tab nav + PromptIQ floating button (staff)
+│   │       ├── TopBar.jsx          # Fixed top header + PromptIQ pill (staff)
+│   │       └── PageWrapper.jsx     # Animated page container
 │   │
 │   └── pages/
-│       ├── LandingPage.jsx    # Public marketing page
-│       ├── AuthPage.jsx       # Login, signup, OTP, password, profile
+│       ├── LandingPage.jsx         # Public marketing page
+│       ├── AuthPage.jsx            # Login, signup, OTP, password, profile
 │       ├── ResetPasswordPage.jsx
-│       ├── CreatePage.jsx     # Templates + tools hub
-│       ├── GeneratePage.jsx   # Active generation screen
-│       ├── ResultPage.jsx     # Download + publish to feed
-│       ├── FeedPage.jsx       # Community feed
-│       ├── HistoryPage.jsx    # User's generation history
-│       ├── ProfilePage.jsx    # Credits, stats, purchases
-│       ├── SettingsPage.jsx   # Theme, password, profile edit
-│       └── AdminPage.jsx      # Dashboard, prompts, feed, users, provider settings
+│       ├── FeedPage.jsx            # Discover: public templates strip + community feed
+│       ├── CreatePage.jsx          # Smart AI tab + Templates + Tools hub
+│       ├── GeneratePage.jsx        # Active generation screen
+│       ├── ResultPage.jsx          # Download + publish to feed
+│       ├── HistoryPage.jsx         # User's generation history
+│       ├── ProfilePage.jsx         # Credits, stats, purchases
+│       ├── SettingsPage.jsx        # Theme, password, profile edit
+│       ├── PromptIQPage.jsx        # Staff-only PromptIQ workspace (sheet)
+│       └── AdminPage.jsx           # Dashboard, prompts, templates, staff, feed, users, settings
 │
 ├── public/
 │   ├── manifest.json          # PWA manifest
@@ -149,7 +162,7 @@ SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
-> **Note:** `VITE_ANTHROPIC_KEY` is no longer needed. Claude Sonnet is accessed through WaveSpeed using `WAVESPEED_KEY`, which also covers all video and image models. Only add a direct `ANTHROPIC_KEY` server-side if you need to bypass WaveSpeed for LLM calls.
+> **Note:** `VITE_ANTHROPIC_KEY` is no longer needed. Claude Sonnet is accessed through WaveSpeed using `WAVESPEED_KEY`. Only add a direct `ANTHROPIC_KEY` server-side if you need to bypass WaveSpeed for LLM calls.
 
 ### 3. Supabase setup
 
@@ -165,52 +178,56 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...
 3. Enable **Google OAuth** in Authentication → Providers
 4. Set Site URL and Redirect URLs in Authentication → URL Configuration
 
-### 4. Deploy Edge Function
+### 4. Create Storage Buckets
+
+In Supabase Dashboard → Storage, create these buckets:
+
+| Bucket              | Public | Purpose                        |
+|---------------------|--------|--------------------------------|
+| `generation-uploads`| Yes    | User-uploaded input images     |
+| `template-assets`   | Yes    | Template thumbnails, media     |
+| `generations`       | Yes    | AI output videos/images        |
+
+### 5. Deploy Edge Function
 
 ```bash
-# Install Supabase CLI
 npm install -g supabase
-
-# Login
 supabase login
-
-# Link project
 supabase link --project-ref your-project-ref
-
-# Set Paystack secret
 supabase secrets set PAYSTACK_SECRET_KEY=sk_live_xxxx
-
-# Deploy
 supabase functions deploy verify-payment
 ```
 
-### 5. Set yourself as admin
-
-After signing up, run this in Supabase SQL Editor:
+### 6. Set yourself as admin
 
 ```sql
-UPDATE profiles
-SET role = 'admin'
-WHERE username = 'your_username';
+UPDATE profiles SET role = 'admin' WHERE username = 'your_username';
 ```
 
-### 6. Run locally
+### 7. Seed templates
+
+```sql
+-- Run after schema to add initial templates
+INSERT INTO templates (name, slug, description, visibility, credit_cost, min_images, max_images, sort_order)
+VALUES
+  ('Office Handover', 'office-handover', 'Cinematic leadership transition video between two people', 'promptiq', 2, 2, 2, 1),
+  ('Memory Lane',     'memory-lane',     'Beautiful photo journey video from your memories',         'public',   1, 3, 20, 2);
+```
+
+### 8. Run locally
 
 ```bash
 npm run dev
 ```
 
-### 7. Deploy to Vercel
+### 9. Deploy to Vercel
 
 ```bash
-# Install Vercel CLI
 npm install -g vercel
-
-# Deploy
 vercel
 ```
 
-Add these in **Vercel Dashboard → Project → Settings → Environment Variables**:
+Add in **Vercel Dashboard → Settings → Environment Variables**:
 
 ```
 FAL_KEY
@@ -224,25 +241,99 @@ VITE_PAYSTACK_PUBLIC_KEY
 
 ---
 
+## PromptIQ — Staff Workspace
+
+Staff members (promoted by admin) get access to **PromptIQ**, a private template workspace.
+
+### How it works
+
+- Admin promotes a user to staff via **Admin Panel → Staff tab**
+- Staff see a glowing ⚡ **PromptIQ button** in the center of BottomNav and a pill button in TopBar
+- Tapping opens the PromptIQ workspace sheet — a curated gallery of exclusive templates
+- Staff PromptIQ templates are **free** (deducted from the shared staff credit pool, not the user's own credits)
+- Public templates are also accessible from PromptIQ but cost the user's own credits
+
+### Staff Credit Pool
+
+A dedicated Supabase user acts as the credit pool. Set its UUID in `app_settings`:
+
+```sql
+INSERT INTO app_settings (key, value) VALUES ('staff_pool_user_id', '"uuid-of-pool-account"');
+```
+
+Top up the pool account's credits from the Admin Panel or directly via SQL.
+
+### Promoting staff
+
+```sql
+-- Via SQL
+SELECT promote_to_staff('admin-uuid', 'user-uuid', 'Senior content creator');
+
+-- Via Admin Panel → Staff tab → Search username → Promote
+```
+
+---
+
+## Template System
+
+Templates are **modular files** in `src/templates/`. Each file exports a definition object. Prompts live in the database (versioned, rollback-able). Assets live in Supabase Storage.
+
+### Template file structure
+
+```js
+// src/templates/my-template.js
+export default {
+  slug:         'my-template',
+  name:         'My Template',
+  visibility:   'promptiq',   // 'promptiq' | 'public'
+  description:  'What it does',
+
+  // User-facing instructions shown before the upload fields
+  instructions: 'Upload a clear photo of Person A, then Person B.',
+
+  // Input fields rendered by TemplateRunner
+  inputs: [
+    { key: 'startFrame', type: 'image', label: 'Person A', hint: 'Clear headshot', required: true },
+    { key: 'endFrame',   type: 'image', label: 'Person B', hint: 'Clear headshot', required: true },
+  ],
+
+  // Which generation settings to expose
+  supportsAspect:   true,
+  supportsDuration: true,
+  supportsModel:    false,
+}
+```
+
+### Adding a new template
+
+1. Create `src/templates/my-template.js`
+2. Import and register it in `src/templates/index.js`
+3. Insert a row into the `templates` table in Supabase
+4. Add an initial prompt in Admin Panel → Prompts tab
+
+No redeployment needed for prompt or asset changes.
+
+---
+
 ## Provider Toggle (Admin)
 
-After deploying, visit `/admin` → **Provider Settings** tab to:
+Visit `/admin` → **Settings** tab to:
 
 - Switch active provider between **WaveSpeed** and **fal.ai** instantly
-- Select preferred Kling model (2.5 Pro / 3.0 Pro)
-- Select preferred Seedance model (1.5 Pro / 2.0)
+- Select preferred Kling model (2.5 / 3.0)
+- Select preferred Seedance model (1.5 / 2.0)
 - Select preferred image model (Nano Banana 2 / Nano Banana Pro)
 
-Changes take effect immediately for all new generations — no redeployment needed. If a generation fails on the active provider, the system automatically falls back to the other provider.
+Changes take effect immediately. Failed generations auto-fallback to the other provider.
 
 ### app_settings table
 
-| key               | default           | options                                   |
-|-------------------|-------------------|-------------------------------------------|
-| `active_provider` | `"fal"`           | `"fal"` · `"wavespeed"`                   |
-| `model_kling`     | `"kling_2_5"`     | `"kling_2_5"` · `"kling_3_0"`             |
-| `model_seedance`  | `"seedance_2_0"`  | `"seedance_1_5"` · `"seedance_2_0"`       |
-| `model_image`     | `"imagen_3_fast"` | `"imagen_3_fast"` · `"imagen_3"`          |
+| key               | default           | options                             |
+|-------------------|-------------------|-------------------------------------|
+| `active_provider` | `"fal"`           | `"fal"` · `"wavespeed"`             |
+| `model_kling`     | `"kling_2_5"`     | `"kling_2_5"` · `"kling_3_0"`       |
+| `model_seedance`  | `"seedance_2_0"`  | `"seedance_1_5"` · `"seedance_2_0"` |
+| `model_image`     | `"imagen_3_fast"` | `"imagen_3_fast"` · `"imagen_3"`    |
 
 ---
 
@@ -264,13 +355,13 @@ Changes take effect immediately for all new generations — no redeployment need
 | Pro      | 100     | ₦32,000  |
 | Creator  | 260     | ₦72,000  |
 
-New users receive **5 free credits** on signup. Credits never expire.
+New users receive **5 free credits** on signup. Credits never expire. Failed generations are auto-refunded via DB trigger.
 
 ---
 
 ## Model Reference
 
-### WaveSpeed model IDs (used in `api/generate.js`)
+### WaveSpeed model IDs
 
 | Key              | Model ID                                          |
 |------------------|---------------------------------------------------|
@@ -300,44 +391,30 @@ New users receive **5 free credits** on signup. Credits never expire.
 
 ## Icons Required
 
-Place these files in `/public/icons/` before deploying:
+Place in `/public/icons/` before deploying:
 
 ```
-icon-72.png
-icon-96.png
-icon-128.png
-icon-144.png
-icon-152.png
-icon-192.png   ← also used as apple-touch-icon
-icon-384.png
-icon-512.png
+icon-72.png   icon-96.png   icon-128.png  icon-144.png
+icon-152.png  icon-192.png  icon-384.png  icon-512.png
 ```
 
-Recommended tool: [realfavicongenerator.net](https://realfavicongenerator.net)
+Recommended: [realfavicongenerator.net](https://realfavicongenerator.net)
 
 ---
 
 ## Admin Access
 
-Visit `/admin` after setting your role to `admin` in the database.
+Visit `/admin` after setting your role to `admin`.
 
-Admin panel includes:
-
-- Dashboard stats (users, generations, revenue, success rate)
-- Prompt version manager with rollback
-- Feed moderation (approve/reject)
-- User management
-- **Provider Settings** — live toggle between WaveSpeed and fal.ai, model selection
-
----
-
-## Adding a New Template
-
-1. Insert into `templates` table in Supabase
-2. Insert initial prompt into `template_prompts` table
-3. Update prompt anytime from Admin Panel → Prompts tab
-
-No redeployment needed.
+| Tab        | What you can do                                             |
+|------------|-------------------------------------------------------------|
+| Dashboard  | Live stats: users, generations, revenue, success rate       |
+| Prompts    | Edit + version template prompts, rollback anytime           |
+| Templates  | Toggle visibility (PromptIQ ↔ Public), upload media assets  |
+| Staff      | Promote/demote staff, view pool balance                     |
+| Feed       | Approve or reject pending community posts                   |
+| Users      | Browse recent users, view credit balances                   |
+| Settings   | Toggle AI provider + model selection live                   |
 
 ---
 
