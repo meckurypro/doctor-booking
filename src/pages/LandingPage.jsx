@@ -203,9 +203,6 @@ export default function LandingPage() {
               Sign in
             </button>
 
-            <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-              5 free credits · No card required
-            </p>
           </motion.div>
         </div>
 
