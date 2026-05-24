@@ -123,7 +123,7 @@ const TemplateDiscoverCard = ({ template, index, onUse }) => {
       <div className="px-3 py-2.5 flex items-center justify-between">
         <p
           className="text-xs font-bold leading-tight flex-1 mr-1"
-          style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+          style={{ color: 'var(--text-primary)' }}
         >
           {template.name}
         </p>
@@ -185,7 +185,7 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
             {post.profiles?.username?.[0]?.toUpperCase() || 'U'}
           </div>
           <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)', fontFamily: 'DM Sans, sans-serif' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               @{post.profiles?.username || 'user'}
             </p>
             {post.templates?.name && (
@@ -229,7 +229,6 @@ export default function FeedPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [activeVideo, setActiveVideo] = useState(null)
 
-  // Load public templates for discovery strip
   useEffect(() => {
     const loadTemplates = async () => {
       const { data } = await templatesDb.getPublic()
@@ -330,7 +329,7 @@ export default function FeedPage() {
         <div className="pt-2 pb-5">
           <h1
             className="text-2xl font-black"
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             Discover
           </h1>
@@ -345,7 +344,7 @@ export default function FeedPage() {
             <div className="flex items-center justify-between mb-3">
               <p
                 className="text-xs font-bold uppercase tracking-wider"
-                style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-secondary)' }}
+                style={{ color: 'var(--text-secondary)' }}
               >
                 ✦ Templates
               </p>
@@ -388,7 +387,7 @@ export default function FeedPage() {
           <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
           <p
             className="text-xs font-bold uppercase tracking-wider"
-            style={{ color: 'var(--text-muted)', fontFamily: 'Syne, sans-serif' }}
+            style={{ color: 'var(--text-muted)' }}
           >
             Community Feed
           </p>
