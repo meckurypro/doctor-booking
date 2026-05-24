@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap } from 'lucide-react'
+console.log('SUPABASE URL:', import.meta.env.VITE_SUPABASE_URL)
 
 const REEL_ITEMS = [
   { id: 1, type: 'gradient', colors: ['#1a0a00', '#f97316', '#7c2d12'], label: 'Office Handover' },
