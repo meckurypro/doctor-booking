@@ -24,7 +24,7 @@ const StatCard = ({ icon: Icon, label, value, color = 'var(--brand)', sub }) => 
       </div>
       <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
     </div>
-    <p className="text-2xl font-black" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+    <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
       {value}
     </p>
     {sub && <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
@@ -90,7 +90,7 @@ const PromptEditor = ({ template, onSave }) => {
     <div className="rounded-2xl overflow-hidden mb-4" style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
       <div className="flex items-center justify-between p-4" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-elevated)' }}>
         <div>
-          <h3 className="font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+          <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>
             {template.name}
           </h3>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -175,8 +175,8 @@ const PromptEditor = ({ template, onSave }) => {
 
 const TemplateManager = ({ templates, onRefresh }) => {
   const { user }                      = useAuth()
-  const [uploading, setUploading]     = useState({})  // { templateId_assetKey: true }
-  const [assets, setAssets]           = useState({})  // { templateId: [asset rows] }
+  const [uploading, setUploading]     = useState({})
+  const [assets, setAssets]           = useState({})
 
   const loadAssets = useCallback(async (templateId) => {
     const { data } = await supabase
@@ -278,7 +278,7 @@ const TemplateManager = ({ templates, onRefresh }) => {
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm truncate" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <p className="font-bold text-sm truncate" style={{ color: 'var(--text-primary)' }}>
                   {template.name}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -434,7 +434,6 @@ const StaffManager = () => {
     setStaffList(staffRes.data  || [])
     setAllUsers(usersRes.data   || [])
 
-    // Pool balance
     const { data: poolSetting } = await supabase.from('app_settings').select('value').eq('key', 'staff_pool_user_id').single()
     if (poolSetting?.value) {
       const { data: poolProfile } = await supabase.from('profiles').select('credits, username').eq('id', poolSetting.value).single()
@@ -482,9 +481,9 @@ const StaffManager = () => {
       <div className="rounded-2xl p-4" style={{ background: 'rgba(249,115,22,0.06)', border: '1px solid rgba(249,115,22,0.2)' }}>
         <div className="flex items-center gap-2 mb-1">
           <Zap size={14} fill="var(--brand)" style={{ color: 'var(--brand)' }} />
-          <p className="text-sm font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--brand)' }}>Staff Credit Pool</p>
+          <p className="text-sm font-bold" style={{ color: 'var(--brand)' }}>Staff Credit Pool</p>
         </div>
-        <p className="text-2xl font-black" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+        <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
           {poolBalance !== null ? `⚡ ${Math.floor(poolBalance)} credits` : 'Not configured'}
         </p>
         <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -494,7 +493,7 @@ const StaffManager = () => {
 
       {/* Current staff */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-secondary)', fontFamily: 'Syne, sans-serif' }}>
+        <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-secondary)' }}>
           Current Staff ({staffList.length})
         </p>
         {staffList.length === 0 ? (
@@ -525,7 +524,7 @@ const StaffManager = () => {
 
       {/* Promote a user */}
       <div>
-        <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-secondary)', fontFamily: 'Syne, sans-serif' }}>
+        <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: 'var(--text-secondary)' }}>
           Promote User to Staff
         </p>
         <input
@@ -591,7 +590,7 @@ const ProviderSettings = () => {
 
   const ToggleGroup = ({ label, settingKey, options, description }) => (
     <div className="rounded-2xl p-4" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-      <p className="text-sm font-bold mb-1" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>{label}</p>
+      <p className="text-sm font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
       {description && <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>{description}</p>}
       <div className="flex gap-2">
         {options.map((opt) => (
@@ -603,7 +602,6 @@ const ProviderSettings = () => {
             style={{
               background: settings[settingKey] === opt.value ? 'var(--brand)' : 'var(--bg-elevated)',
               color:      settings[settingKey] === opt.value ? 'white' : 'var(--text-muted)',
-              fontFamily: 'Syne, sans-serif',
             }}
           >
             {opt.label}
@@ -691,7 +689,7 @@ export default function AdminPage() {
         <button onClick={() => navigate('/profile')} className="p-2 -ml-2 rounded-xl" style={{ color: 'var(--text-secondary)' }} aria-label="Back to profile">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-base font-bold flex-1" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>Admin Panel</h1>
+        <h1 className="text-base font-bold flex-1" style={{ color: 'var(--text-primary)' }}>Admin Panel</h1>
         <button onClick={loadData} className="p-2 rounded-xl" style={{ color: 'var(--text-muted)' }} aria-label="Refresh data">
           <RotateCcw size={16} />
         </button>
@@ -707,7 +705,6 @@ export default function AdminPage() {
             style={{
               background: activeTab === tab.id ? 'var(--brand)' : 'var(--bg-elevated)',
               color:      activeTab === tab.id ? 'white' : 'var(--text-muted)',
-              fontFamily: 'Syne, sans-serif',
             }}
           >
             {tab.label}
@@ -788,14 +785,14 @@ export default function AdminPage() {
             <div className="flex flex-col gap-2">
               {recentUsers.map((u) => (
                 <div key={u.id} className="flex items-center gap-3 p-3 rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ background: 'var(--brand)', color: 'white', fontFamily: 'Syne, sans-serif' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ background: 'var(--brand)', color: 'white' }}>
                     {u.username?.[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>@{u.username}</p>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{u.total_generations} generations · ⚡{u.credits?.toFixed(1)} credits</p>
                   </div>
-                  <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--brand)', fontFamily: 'Syne, sans-serif' }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full capitalize" style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--brand)' }}>
                     {u.tier}
                   </span>
                 </div>
