@@ -7,8 +7,7 @@ import { generations as generationsDb, credits as creditsDb, auth } from '@/lib/
 import { useAuth } from '@/context/AuthContext'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageWrapper } from '@/components/layout/PageWrapper'
-import { Button } from '@/components/ui/Button'
-import { Modal, Skeleton, CreditBadge } from '@/components/ui/Modal'
+import { Modal, Skeleton } from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
 
 // ─── Package Card ─────────────────────────────────────────
@@ -29,7 +28,7 @@ const PackageCard = ({ pkg, onSelect, loading }) => (
     {pkg.is_featured && (
       <div
         className="absolute top-3 right-3 px-2 py-0.5 rounded-full text-xs font-bold"
-        style={{ background: 'var(--brand)', color: 'white', fontFamily: 'Syne, sans-serif' }}
+        style={{ background: 'var(--brand)', color: 'white' }}
       >
         Best Value
       </div>
@@ -42,7 +41,7 @@ const PackageCard = ({ pkg, onSelect, loading }) => (
         <Zap size={20} fill={pkg.is_featured ? 'var(--brand)' : 'none'} style={{ color: 'var(--brand)' }} />
       </div>
       <div className="flex-1">
-        <p className="font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+        <p className="font-bold" style={{ color: 'var(--text-primary)' }}>
           {pkg.name}
         </p>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
@@ -52,7 +51,7 @@ const PackageCard = ({ pkg, onSelect, loading }) => (
           )}
         </p>
       </div>
-      <p className="font-black text-lg" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+      <p className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>
         ₦{pkg.price_ngn?.toLocaleString()}
       </p>
     </div>
@@ -81,7 +80,7 @@ const HistoryItem = ({ gen, onClick }) => (
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <p className="text-sm font-semibold truncate" style={{ fontFamily: 'DM Sans, sans-serif', color: 'var(--text-primary)' }}>
+      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
         {gen.templates?.name || gen.generation_type?.replace(/_/g, ' ')}
       </p>
       <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -104,14 +103,14 @@ const HistoryItem = ({ gen, onClick }) => (
 // ─── Profile Page ─────────────────────────────────────────
 
 export default function ProfilePage() {
-  const navigate                                    = useNavigate()
-  const { user, profile, credits, refreshProfile, isAdmin } = useAuth()
+  const navigate                                              = useNavigate()
+  const { user, profile, credits, refreshProfile, isAdmin }  = useAuth()
 
-  const [history, setHistory]               = useState([])
-  const [packages, setPackages]             = useState([])
-  const [historyLoading, setHistoryLoading] = useState(true)
+  const [history,         setHistory]         = useState([])
+  const [packages,        setPackages]        = useState([])
+  const [historyLoading,  setHistoryLoading]  = useState(true)
   const [showCreditsModal, setShowCreditsModal] = useState(false)
-  const [purchaseLoading, setPurchaseLoading]   = useState(false)
+  const [purchaseLoading,  setPurchaseLoading]  = useState(false)
 
   const loadHistory = useCallback(async () => {
     if (!user) return
@@ -130,16 +129,9 @@ export default function ProfilePage() {
     loadPackages()
   }, [loadHistory])
 
-  // ── Purchase ──────────────────────────────────────────
-  // Verification and credit addition happen server-side in the
-  // verify-payment Edge Function — not here. Client only opens
-  // the Paystack popup and polls for confirmation.
   const handlePurchase = async (pkg) => {
     setPurchaseLoading(true)
-
-    // Import here to avoid top-level side effects
     const { initializePayment } = await import('@/lib/paystack')
-
     initializePayment({
       email:        user.email,
       amountNgn:    pkg.price_ngn,
@@ -148,8 +140,6 @@ export default function ProfilePage() {
       packageSlug:  pkg.slug,
       userId:       user.id,
       onSuccess: async () => {
-        // Edge Function handles verification + crediting.
-        // Refresh profile to pick up new balance.
         await refreshProfile()
         setShowCreditsModal(false)
         toast.success(`${pkg.credits + (pkg.bonus_credits || 0)} credits added! 🎉`)
@@ -179,19 +169,19 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4">
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white', fontFamily: 'Syne, sans-serif' }}
+              style={{ background: 'linear-gradient(135deg, #f97316, #ea580c)', color: 'white' }}
             >
               {profile?.username?.[0]?.toUpperCase() || 'M'}
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black truncate" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+              <h2 className="text-xl font-black truncate" style={{ color: 'var(--text-primary)' }}>
                 {profile?.display_name || profile?.username}
               </h2>
               <p className="text-sm" style={{ color: 'var(--text-muted)' }}>@{profile?.username}</p>
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                  style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--brand)', fontFamily: 'Syne, sans-serif' }}
+                  style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--brand)' }}
                 >
                   {profile?.tier || 'free'}
                 </span>
@@ -218,13 +208,19 @@ export default function ProfilePage() {
               <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Available credits</p>
               <div className="flex items-center gap-2">
                 <Zap size={24} fill="var(--brand)" style={{ color: 'var(--brand)' }} />
-                <span className="text-4xl font-black" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+                <span className="text-4xl font-black" style={{ color: 'var(--text-primary)' }}>
                   {Math.floor(credits)}
                 </span>
               </div>
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Credits never expire</p>
             </div>
-            <Button variant="primary" size="sm" icon={Plus}>Buy credits</Button>
+            <button
+              className="flex items-center gap-2 py-3 px-4 rounded-2xl text-sm font-bold tracking-tight"
+              style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
+            >
+              <Plus size={14} />
+              Buy credits
+            </button>
           </div>
           <div
             className="mt-3 pt-3 flex items-center gap-4 text-xs"
@@ -248,9 +244,7 @@ export default function ProfilePage() {
               style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
             >
               <item.icon size={20} />
-              <span className="text-sm font-semibold" style={{ fontFamily: 'Syne, sans-serif' }}>
-                {item.label}
-              </span>
+              <span className="text-sm font-semibold">{item.label}</span>
             </button>
           ))}
         </div>
@@ -259,7 +253,7 @@ export default function ProfilePage() {
         <div className="mb-6">
           <h3
             className="text-base font-bold flex items-center gap-2 mb-3"
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+            style={{ color: 'var(--text-primary)' }}
           >
             <Clock size={16} /> Recent Creations
           </h3>
@@ -286,17 +280,26 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <Button onClick={handleSignOut} variant="ghost" size="md" fullWidth icon={LogOut}>
+        <button
+          onClick={handleSignOut}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+          style={{
+            background: 'var(--bg-elevated)',
+            color:      'var(--text-secondary)',
+            border:     '1px solid var(--border)',
+          }}
+        >
+          <LogOut size={16} />
           Sign out
-        </Button>
+        </button>
       </PageWrapper>
 
       {/* Credits Modal */}
       <Modal isOpen={showCreditsModal} onClose={() => setShowCreditsModal(false)} title="Buy credits">
         <div className="flex flex-col gap-3">
           <div className="p-3 rounded-2xl mb-1" style={{ background: 'var(--bg-elevated)' }}>
-            <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)', fontFamily: 'Syne, sans-serif' }}>
-              CREDIT COSTS
+            <p className="text-xs font-semibold mb-2 uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+              Credit costs
             </p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               {[
