@@ -9,6 +9,10 @@ import { supabase, profiles as profilesApi } from '@/lib/supabase'
 const PROFILE_RETRY_ATTEMPTS = 4
 const PROFILE_RETRY_DELAY_MS = 800
 
+// OAuth providers that auto-populate display_name + avatar_url via
+// the DB trigger, so those users never need the onboarding flow.
+const OAUTH_PROVIDERS = new Set(['google', 'github', 'facebook', 'apple'])
+
 // ─────────────────────────────────────────────────────────────
 // Context
 // ─────────────────────────────────────────────────────────────
@@ -16,37 +20,57 @@ const PROFILE_RETRY_DELAY_MS = 800
 const AuthContext = createContext(null)
 
 // ─────────────────────────────────────────────────────────────
-// Helpers
+// Pure helpers (no React deps — safe to define at module scope)
 // ─────────────────────────────────────────────────────────────
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
- * Fetches a profile by userId with exponential-ish retry to handle
- * the race condition where Supabase's DB trigger hasn't created the
- * profile row yet when onAuthStateChange fires SIGNED_IN.
+ * Fetches a profile by userId, retrying up to PROFILE_RETRY_ATTEMPTS times
+ * to handle the race condition where Supabase's DB trigger hasn't yet created
+ * the row when onAuthStateChange fires SIGNED_IN.
  *
- * Returns { data, isNewUser }
- *   - data      → profile row (or null if genuinely doesn't exist after retries)
- *   - isNewUser → true when every attempt returned nothing (first OAuth signup)
+ * @returns {{ data: object|null, isNewUser: boolean }}
  */
 const fetchProfileWithRetry = async (userId) => {
   for (let attempt = 0; attempt < PROFILE_RETRY_ATTEMPTS; attempt++) {
     const { data, error } = await profilesApi.getById(userId)
 
-    if (error) {
+    if (data) return { data, isNewUser: false }
+
+    // Log real errors (not "row not found") for observability
+    if (error && error.code !== 'PGRST116') {
       console.error(`AuthContext: fetchProfile attempt ${attempt + 1} error`, error)
     }
 
-    if (data) return { data, isNewUser: false }
-
-    // Don't wait after the last attempt
     if (attempt < PROFILE_RETRY_ATTEMPTS - 1) {
       await sleep(PROFILE_RETRY_DELAY_MS)
     }
   }
 
   return { data: null, isNewUser: true }
+}
+
+/**
+ * Determines whether a user still needs to complete onboarding.
+ *
+ * Rules (in order):
+ *  1. DB flag is authoritative — if onboarding_completed = true, never show onboarding.
+ *  2. OAuth users whose trigger already wrote display_name + avatar_url are treated
+ *     as complete even if the DB flag is still false (safety net for trigger lag /
+ *     existing rows created before the trigger was updated).
+ *  3. Everyone else: respect the DB flag.
+ */
+const deriveOnboardingNeeded = (profile, authUser) => {
+  if (!profile) return true
+  if (profile.onboarding_completed) return false
+
+  // Safety net: OAuth user already has a real display name and avatar
+  const provider = authUser?.app_metadata?.provider ?? ''
+  const hasOAuthProfile = OAUTH_PROVIDERS.has(provider) && !!profile.display_name && !!profile.avatar_url
+  if (hasOAuthProfile) return false
+
+  return true
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -59,21 +83,23 @@ export const AuthProvider = ({ children }) => {
   const [loading,          setLoading]          = useState(true)
   const [onboardingNeeded, setOnboardingNeeded] = useState(false)
 
-  // Tracks which userId is currently being loaded to prevent
-  // duplicate concurrent fetches for the same user.
+  // Ref holds the userId currently being fetched.
+  // Prevents duplicate concurrent loads and detects stale results.
   const activeProfileLoad = useRef(null)
 
-  // ── Core: load + apply profile state ──────────────────────
-  const loadProfile = useCallback(async (userId) => {
-    // De-duplicate: if already loading for this user, bail out
-    if (activeProfileLoad.current === userId) return
+  // ── Core: fetch profile and apply derived state ────────────
+  const loadProfile = useCallback(async (authUser) => {
+    const userId = authUser?.id
+    if (!userId) return
 
+    // De-duplicate: skip if already loading for this exact user
+    if (activeProfileLoad.current === userId) return
     activeProfileLoad.current = userId
 
     try {
       const { data, isNewUser } = await fetchProfileWithRetry(userId)
 
-      // Guard: if the user changed while we were awaiting, discard stale result
+      // Discard stale result if the active user changed during the await
       if (activeProfileLoad.current !== userId) return
 
       if (isNewUser || !data) {
@@ -81,24 +107,22 @@ export const AuthProvider = ({ children }) => {
         setOnboardingNeeded(true)
       } else {
         setProfile(data)
-        setOnboardingNeeded(!data.onboarding_completed)
+        setOnboardingNeeded(deriveOnboardingNeeded(data, authUser))
       }
     } finally {
-      // Always clear the lock for this userId
       if (activeProfileLoad.current === userId) {
         activeProfileLoad.current = null
       }
     }
   }, [])
 
-  // ── Bootstrap: check existing session on mount ─────────────
+  // ── Bootstrap: resolve existing session on mount ───────────
   useEffect(() => {
     let mounted = true
 
     const init = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-
         if (!mounted) return
 
         if (error) {
@@ -108,7 +132,7 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user) {
           setUser(session.user)
-          await loadProfile(session.user.id)
+          await loadProfile(session.user)
         }
       } catch (err) {
         console.error('AuthContext: unexpected init error', err)
@@ -119,7 +143,7 @@ export const AuthProvider = ({ children }) => {
 
     init()
 
-    // ── Auth state listener ──────────────────────────────────
+    // ── Realtime auth state listener ─────────────────────────
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
@@ -134,7 +158,8 @@ export const AuthProvider = ({ children }) => {
           }
 
           case 'TOKEN_REFRESHED': {
-            // Session refreshed silently — user/profile unchanged, nothing to do
+            // Token silently refreshed — session is still valid,
+            // user and profile are unchanged, nothing to do.
             break
           }
 
@@ -143,7 +168,7 @@ export const AuthProvider = ({ children }) => {
           case 'INITIAL_SESSION': {
             if (session?.user) {
               setUser(session.user)
-              await loadProfile(session.user.id)
+              await loadProfile(session.user)
             }
             break
           }
@@ -163,21 +188,32 @@ export const AuthProvider = ({ children }) => {
 
   // ── Public helpers ─────────────────────────────────────────
 
-  /** Re-fetch the profile from DB (e.g. after the user updates their account). */
+  /**
+   * Re-fetches the profile from the DB.
+   * Call after any server-side change to the profile row.
+   */
   const refreshProfile = useCallback(async () => {
-    if (!user?.id) return
-    // Force a fresh load by clearing the lock first
-    activeProfileLoad.current = null
-    await loadProfile(user.id)
+    if (!user) return
+    activeProfileLoad.current = null   // force bypass de-dupe guard
+    await loadProfile(user)
   }, [user, loadProfile])
 
   /**
-   * Optimistic local update — call immediately after a successful
-   * profiles.update() to keep UI in sync without a round-trip.
+   * Applies an optimistic local update to the profile in state.
+   * Call immediately after a successful profiles.update() to keep
+   * the UI in sync without waiting for a round-trip.
+   *
+   * @param {Partial<Profile>} updates
    */
   const updateProfileLocal = useCallback((updates) => {
-    setProfile((prev) => (prev ? { ...prev, ...updates } : prev))
-  }, [])
+    setProfile((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...updates }
+      // Re-derive onboarding state in case onboarding_completed was just set
+      setOnboardingNeeded(deriveOnboardingNeeded(next, user))
+      return next
+    })
+  }, [user])
 
   // ── Context value ──────────────────────────────────────────
   const value = {
@@ -204,7 +240,7 @@ export const AuthProvider = ({ children }) => {
 // ─────────────────────────────────────────────────────────────
 
 export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth must be used within an <AuthProvider>')
-  return context
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within an <AuthProvider>')
+  return ctx
 }
