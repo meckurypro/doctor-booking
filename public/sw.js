@@ -1,6 +1,9 @@
 // public/sw.js
-const CACHE_NAME    = 'meckury-v1'
-const STATIC_ASSETS = ['/', '/index.html', '/manifest.json']
+// Network-first for HTML (prevents blank screen after Vercel redeploy)
+// Cache-first for static assets (fonts, icons, images)
+
+const CACHE_NAME    = 'meckury-v3'
+const STATIC_ASSETS = ['/manifest.json']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -22,18 +25,60 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
 
   const url = event.request.url
+
+  // Never intercept API or external service calls
   if (
-    url.includes('/api/')       ||
-    url.includes('supabase')    ||
-    url.includes('fal.ai')      ||
-    url.includes('anthropic')   ||
-    url.includes('paystack')    ||
-    url.includes('googleapis')
+    url.includes('/api/')      ||
+    url.includes('supabase')   ||
+    url.includes('fal.ai')     ||
+    url.includes('wavespeed')  ||
+    url.includes('anthropic')  ||
+    url.includes('paystack')   ||
+    url.includes('googleapis') ||
+    url.includes('gstatic')
   ) return
 
+  const isHTML = event.request.headers.get('accept')?.includes('text/html')
+  const isJSorCSS = url.match(/\.(js|css)(\?|$)/)
+
+  // ── HTML pages: always network-first ────────────────────────
+  // This is the key fix — stale HTML after redeploy causes blank screen
+  if (isHTML) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Don't cache HTML — always get fresh from network
+          return response
+        })
+        .catch(() => {
+          // Offline fallback — serve cached index.html if available
+          return caches.match('/index.html')
+        })
+    )
+    return
+  }
+
+  // ── JS/CSS chunks: network-first (new deploy = new hashes) ──
+  if (isJSorCSS) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.status === 200) {
+            const copy = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
+          }
+          return response
+        })
+        .catch(() => caches.match(event.request))
+    )
+    return
+  }
+
+  // ── Static assets (icons, images, fonts): cache-first ───────
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
+      if (cached) return cached
+      return fetch(event.request).then((response) => {
         if (response.status === 200) {
           const copy = response.clone()
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
