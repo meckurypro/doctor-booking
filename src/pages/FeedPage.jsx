@@ -1,8 +1,9 @@
 // src/pages/FeedPage.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Heart, Play, Film, Image, X } from 'lucide-react'
-import { feed as feedDb } from '@/lib/supabase'
+import { Heart, Play, Film, Image, X, Sparkles, ArrowRight, Star } from 'lucide-react'
+import { feed as feedDb, templates as templatesDb } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageWrapper } from '@/components/layout/PageWrapper'
@@ -57,6 +58,78 @@ const VideoModal = ({ url, onClose }) => {
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+// ─── Template Discover Card (horizontal scroll strip) ─────
+
+const TemplateDiscoverCard = ({ template, index, onUse }) => {
+  const creditLabel = template.credit_cost_per_image
+    ? `${template.credit_cost_per_image} cr/photo`
+    : `${template.credit_cost ?? 2} credits`
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.07 }}
+      whileTap={{ scale: 0.96 }}
+      onClick={() => onUse(template)}
+      className="flex-shrink-0 w-40 rounded-3xl overflow-hidden text-left"
+      style={{
+        background: 'var(--bg-card)',
+        border:     '1px solid var(--border)',
+        boxShadow:  'var(--shadow)',
+      }}
+    >
+      {/* Thumbnail */}
+      <div
+        className="h-24 w-full relative flex items-center justify-center"
+        style={{
+          background: template.thumbnail_url
+            ? undefined
+            : 'linear-gradient(135deg, rgba(249,115,22,0.2), rgba(234,88,12,0.08))',
+        }}
+      >
+        {template.thumbnail_url ? (
+          <img
+            src={template.thumbnail_url}
+            alt={template.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <Sparkles size={28} style={{ color: 'var(--brand)', opacity: 0.5 }} />
+        )}
+
+        {template.is_featured && (
+          <div
+            className="absolute top-2 left-2 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-bold"
+            style={{ background: 'var(--brand)', color: 'white', fontSize: '9px' }}
+          >
+            <Star size={8} fill="white" />
+            Hot
+          </div>
+        )}
+
+        <div
+          className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-full text-xs font-bold"
+          style={{ background: 'rgba(0,0,0,0.55)', color: 'white', backdropFilter: 'blur(4px)', fontSize: '9px' }}
+        >
+          ⚡ {creditLabel}
+        </div>
+      </div>
+
+      {/* Name + arrow */}
+      <div className="px-3 py-2.5 flex items-center justify-between">
+        <p
+          className="text-xs font-bold leading-tight flex-1 mr-1"
+          style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+        >
+          {template.name}
+        </p>
+        <ArrowRight size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+      </div>
+    </motion.button>
   )
 }
 
@@ -144,14 +217,27 @@ const FeedCard = ({ post, liked, onLike, onPlayVideo }) => {
 const PAGE_SIZE = 20
 
 export default function FeedPage() {
+  const navigate                      = useNavigate()
   const { user }                      = useAuth()
   const [posts, setPosts]             = useState([])
+  const [publicTemplates, setPublicTemplates] = useState([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
   const [loading, setLoading]         = useState(true)
   const [likedPosts, setLikedPosts]   = useState(new Set())
   const [page, setPage]               = useState(0)
   const [hasMore, setHasMore]         = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [activeVideo, setActiveVideo] = useState(null)
+
+  // Load public templates for discovery strip
+  useEffect(() => {
+    const loadTemplates = async () => {
+      const { data } = await templatesDb.getPublic()
+      setPublicTemplates(data || [])
+      setTemplatesLoading(false)
+    }
+    loadTemplates()
+  }, [])
 
   const loadPosts = useCallback(async (offset = 0, reset = false) => {
     if (offset === 0) setLoading(true)
@@ -183,7 +269,6 @@ export default function FeedPage() {
     if (!user) return toast.error('Sign in to like posts')
 
     const wasLiked = likedPosts.has(postId)
-
     setLikedPosts((prev) => {
       const next = new Set(prev)
       wasLiked ? next.delete(postId) : next.add(postId)
@@ -198,9 +283,7 @@ export default function FeedPage() {
     )
 
     const { data } = await feedDb.toggleLike(user.id, postId)
-
     if (!data?.success) {
-      // Revert on failure
       setLikedPosts((prev) => {
         const next = new Set(prev)
         wasLiked ? next.add(postId) : next.delete(postId)
@@ -216,6 +299,22 @@ export default function FeedPage() {
     }
   }
 
+  const handleTemplateUse = (template) => {
+    navigate('/generate', {
+      state: {
+        type:               'template',
+        templateId:         template.id,
+        templateSlug:       template.slug,
+        templateName:       template.name,
+        templateDescription: template.description,
+        minImages:          template.min_images,
+        maxImages:          template.max_images,
+        creditCost:         template.credit_cost,
+        creditCostPerImage: template.credit_cost_per_image,
+      },
+    })
+  }
+
   const handleLoadMore = () => {
     const nextPage = page + 1
     setPage(nextPage)
@@ -226,15 +325,77 @@ export default function FeedPage() {
     <>
       <TopBar showLogo showCredits />
       <PageWrapper>
-        <div className="pt-2 pb-4">
-          <h1 className="text-2xl font-black" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
-            Community
+
+        {/* ── Page heading ─────────────────────────────────── */}
+        <div className="pt-2 pb-5">
+          <h1
+            className="text-2xl font-black"
+            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
+          >
+            Discover
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Creations from the Meckury community
+            Templates + community creations
           </p>
         </div>
 
+        {/* ── Public Templates discovery strip ─────────────── */}
+        {(templatesLoading || publicTemplates.length > 0) && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <p
+                className="text-xs font-bold uppercase tracking-wider"
+                style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-secondary)' }}
+              >
+                ✦ Templates
+              </p>
+              <button
+                onClick={() => navigate('/create')}
+                className="text-xs font-semibold flex items-center gap-1"
+                style={{ color: 'var(--brand)' }}
+              >
+                See all <ArrowRight size={12} />
+              </button>
+            </div>
+
+            {templatesLoading ? (
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+                {[...Array(3)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-shrink-0 w-40 h-40 rounded-3xl"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1 -mx-4 px-4">
+                {publicTemplates.map((template, i) => (
+                  <TemplateDiscoverCard
+                    key={template.id}
+                    template={template}
+                    index={i}
+                    onUse={handleTemplateUse}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Divider ───────────────────────────────────────── */}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+          <p
+            className="text-xs font-bold uppercase tracking-wider"
+            style={{ color: 'var(--text-muted)', fontFamily: 'Syne, sans-serif' }}
+          >
+            Community Feed
+          </p>
+          <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+        </div>
+
+        {/* ── Community feed grid ───────────────────────────── */}
         {loading ? (
           <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 6 }).map((_, i) => (
