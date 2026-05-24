@@ -8,7 +8,6 @@ import { useAuth } from '@/context/AuthContext'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageWrapper } from '@/components/layout/PageWrapper'
 import { Skeleton, EmptyState } from '@/components/ui/Modal'
-import { Button } from '@/components/ui/Button'
 
 // ─── Status Badge ─────────────────────────────────────────
 
@@ -24,7 +23,7 @@ const StatusBadge = ({ status }) => {
   return (
     <span
       className="text-xs px-2 py-0.5 rounded-full font-semibold"
-      style={{ background: s.bg, color: s.color, fontFamily: 'Syne, sans-serif' }}
+      style={{ background: s.bg, color: s.color }}
     >
       {s.label}
     </span>
@@ -53,18 +52,9 @@ const HistoryCard = ({ gen, onClick }) => {
       >
         {gen.output_url ? (
           isVideo ? (
-            <video
-              src={gen.output_url}
-              className="w-full h-full object-cover"
-              muted
-              preload="metadata"
-            />
+            <video src={gen.output_url} className="w-full h-full object-cover" muted preload="metadata" />
           ) : (
-            <img
-              src={gen.output_url}
-              alt={gen.templates?.name || typeLabel}
-              className="w-full h-full object-cover"
-            />
+            <img src={gen.output_url} alt={gen.templates?.name || typeLabel} className="w-full h-full object-cover" />
           )
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -74,7 +64,6 @@ const HistoryCard = ({ gen, onClick }) => {
             }
           </div>
         )}
-        {/* Output type pill */}
         <div
           className="absolute bottom-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
           style={{ background: 'rgba(0,0,0,0.6)' }}
@@ -89,10 +78,7 @@ const HistoryCard = ({ gen, onClick }) => {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-sm font-semibold truncate capitalize"
-          style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
-        >
+        <p className="text-sm font-semibold truncate capitalize" style={{ color: 'var(--text-primary)' }}>
           {gen.templates?.name || typeLabel || 'Generation'}
         </p>
         <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
@@ -118,11 +104,7 @@ const HistoryCard = ({ gen, onClick }) => {
 
 // ─── Filters ──────────────────────────────────────────────
 
-// NOTE: Filtering is client-side against the current page of results.
-// Users with many failed generations may see fewer than 20 per page — this
-// is a known trade-off. Server-side filtering can be added to generationsDb.getUserGenerations.
-const FILTERS = ['all', 'completed', 'failed']
-
+const FILTERS   = ['all', 'completed', 'failed']
 const PAGE_SIZE = 20
 
 // ─── History Page ─────────────────────────────────────────
@@ -131,13 +113,13 @@ export default function HistoryPage() {
   const navigate  = useNavigate()
   const { user }  = useAuth()
 
-  const [history, setHistory]         = useState([])
-  const [loading, setLoading]         = useState(true)
+  const [history,     setHistory]     = useState([])
+  const [loading,     setLoading]     = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [filter, setFilter]           = useState('all')
-  const [page, setPage]               = useState(0)
-  const [hasMore, setHasMore]         = useState(true)
-  const [totalCount, setTotalCount]   = useState(0)
+  const [filter,      setFilter]      = useState('all')
+  const [page,        setPage]        = useState(0)
+  const [hasMore,     setHasMore]     = useState(true)
+  const [totalCount,  setTotalCount]  = useState(0)
 
   const loadHistory = useCallback(async (offset = 0, reset = false) => {
     if (!user) return
@@ -172,12 +154,10 @@ export default function HistoryPage() {
     <>
       <TopBar title="History" showCredits />
       <PageWrapper>
+
         {/* Header */}
         <div className="pt-2 pb-5">
-          <h1
-            className="text-2xl font-black"
-            style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}
-          >
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>
             My Creations
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -193,9 +173,8 @@ export default function HistoryPage() {
               onClick={() => setFilter(f)}
               className="px-4 py-2 rounded-xl text-sm font-semibold capitalize transition-all"
               style={{
-                background: filter === f ? 'var(--brand)' : 'var(--bg-elevated)',
-                color:      filter === f ? 'white' : 'var(--text-muted)',
-                fontFamily: 'Syne, sans-serif',
+                background: filter === f ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                color:      filter === f ? 'var(--text-inverse)' : 'var(--text-muted)',
               }}
             >
               {f}
@@ -221,9 +200,13 @@ export default function HistoryPage() {
             }
             action={
               filter === 'all' && (
-                <Button onClick={() => navigate('/create')} variant="primary" size="md">
+                <button
+                  onClick={() => navigate('/create')}
+                  className="py-3 px-6 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
+                  style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
+                >
                   Create something
-                </Button>
+                </button>
               )
             }
           />
@@ -246,9 +229,17 @@ export default function HistoryPage() {
             ))}
 
             {hasMore && !loadingMore && (
-              <Button onClick={handleLoadMore} variant="secondary" size="md" fullWidth>
+              <button
+                onClick={handleLoadMore}
+                className="w-full py-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  color:      'var(--text-secondary)',
+                  border:     '1px solid var(--border)',
+                }}
+              >
                 Load more
-              </Button>
+              </button>
             )}
 
             {loadingMore && <Skeleton className="h-20 w-full" />}
