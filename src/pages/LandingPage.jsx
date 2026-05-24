@@ -4,45 +4,14 @@ import { motion } from 'framer-motion'
 import { Zap } from 'lucide-react'
 
 const REEL_ITEMS = [
-  {
-    id: 1,
-    type: 'gradient',
-    colors: ['#1a0a00', '#f97316', '#7c2d12'],
-    label: 'Office Handover',
-  },
-  {
-    id: 2,
-    type: 'gradient',
-    colors: ['#000000', '#1c1c1c', '#2d2d2d'],
-    label: 'Memory Lane',
-  },
-  {
-    id: 3,
-    type: 'gradient',
-    colors: ['#0a0a1a', '#1e3a5f', '#0ea5e9'],
-    label: 'AI Portrait',
-  },
-  {
-    id: 4,
-    type: 'gradient',
-    colors: ['#0a1a0a', '#14532d', '#16a34a'],
-    label: 'Brand Video',
-  },
-  {
-    id: 5,
-    type: 'gradient',
-    colors: ['#1a0a1a', '#6b21a8', '#a855f7'],
-    label: 'Cinematic',
-  },
-  {
-    id: 6,
-    type: 'gradient',
-    colors: ['#1a1000', '#92400e', '#d97706'],
-    label: 'History',
-  },
+  { id: 1, type: 'gradient', colors: ['#1a0a00', '#f97316', '#7c2d12'], label: 'Office Handover' },
+  { id: 2, type: 'gradient', colors: ['#000000', '#1c1c1c', '#2d2d2d'], label: 'Memory Lane' },
+  { id: 3, type: 'gradient', colors: ['#0a0a1a', '#1e3a5f', '#0ea5e9'], label: 'AI Portrait' },
+  { id: 4, type: 'gradient', colors: ['#0a1a0a', '#14532d', '#16a34a'], label: 'Brand Video' },
+  { id: 5, type: 'gradient', colors: ['#1a0a1a', '#6b21a8', '#a855f7'], label: 'Cinematic' },
+  { id: 6, type: 'gradient', colors: ['#1a1000', '#92400e', '#d97706'], label: 'History' },
 ]
 
-// ── Reel card ─────────────────────────────────────────────
 const ReelCard = ({ item, index }) => (
   <motion.div
     initial={{ opacity: 0, y: 30 }}
@@ -57,9 +26,7 @@ const ReelCard = ({ item, index }) => (
   >
     <div
       className="absolute inset-0"
-      style={{
-        background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%)',
-      }}
+      style={{ background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%)' }}
     />
     <div className="absolute bottom-0 left-0 right-0 p-3">
       <p className="text-white text-xs font-semibold leading-tight" style={{ opacity: 0.85 }}>
@@ -82,7 +49,6 @@ const ReelCard = ({ item, index }) => (
   </motion.div>
 )
 
-// ── Landing Page ──────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate()
 
@@ -104,7 +70,6 @@ export default function LandingPage() {
           WebkitBackdropFilter: 'blur(12px)',
         }}
       >
-        {/* Logo */}
         <div className="flex items-center gap-2">
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center"
@@ -112,17 +77,13 @@ export default function LandingPage() {
           >
             <Zap size={14} fill="white" className="text-white" />
           </div>
-          <span className="font-bold text-base tracking-tight">Meckury</span>
+          <span className="font-bold text-base tracking-tight">Meckury AI</span>
         </div>
 
-        {/* Sign in */}
         <button
           onClick={() => navigate('/auth')}
           className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-          style={{
-            background: 'var(--bg-elevated)',
-            color: 'var(--text-primary)',
-          }}
+          style={{ background: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
         >
           Sign in
         </button>
@@ -132,7 +93,7 @@ export default function LandingPage() {
       <main className="flex-1 flex flex-col pt-14">
 
         {/* ── Hero ──────────────────────────────────────── */}
-        <div className="w-full max-w-screen-xl mx-auto px-8 pt-20 pb-16 flex flex-col lg:flex-row lg:items-center lg:gap-20">
+        <div className="w-full max-w-screen-xl mx-auto px-8 pt-20 pb-16 flex flex-col lg:flex-row lg:items-start lg:gap-20">
 
           {/* Left: copy + CTAs */}
           <div className="flex-1 min-w-0">
@@ -169,7 +130,6 @@ export default function LandingPage() {
               No skills required.
             </motion.p>
 
-            {/* CTAs */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -180,10 +140,7 @@ export default function LandingPage() {
               <button
                 onClick={() => navigate('/auth')}
                 className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
-                style={{
-                  background: 'var(--text-primary)',
-                  color: 'var(--text-inverse)',
-                }}
+                style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
               >
                 Get started free →
               </button>
@@ -202,22 +159,34 @@ export default function LandingPage() {
             </motion.div>
           </div>
 
-          {/* Right: reel grid (desktop) / hidden on mobile — shown in strip below */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.6, ease: 'easeOut' }}
-            className="hidden lg:grid mt-0"
-            style={{
-              gridTemplateColumns: 'repeat(3, 160px)',
-              gridTemplateRows: 'repeat(2, 220px)',
-              gap: '12px',
-            }}
-          >
-            {REEL_ITEMS.map((item, i) => (
-              <ReelCard key={item.id} item={item} index={i} />
-            ))}
-          </motion.div>
+          {/* Right: label + reel grid (desktop only) */}
+          <div className="hidden lg:flex flex-col gap-3">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Made with Meckury AI
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.45, duration: 0.6, ease: 'easeOut' }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 160px)',
+                gridTemplateRows: 'repeat(2, 220px)',
+                gap: '12px',
+              }}
+            >
+              {REEL_ITEMS.map((item, i) => (
+                <ReelCard key={item.id} item={item} index={i} />
+              ))}
+            </motion.div>
+          </div>
         </div>
 
         {/* ── Video reel strip (mobile only) ────────────── */}
@@ -229,7 +198,8 @@ export default function LandingPage() {
             className="px-8 text-xs font-semibold uppercase tracking-widest mb-4"
             style={{ color: 'var(--text-muted)' }}
           >
-               </motion.p>
+            Made with Meckury AI
+          </motion.p>
 
           <div className="flex gap-3 overflow-x-auto no-scrollbar px-8 pb-2">
             {REEL_ITEMS.map((item, i) => (
@@ -238,17 +208,6 @@ export default function LandingPage() {
             <div className="flex-shrink-0 w-1" />
           </div>
         </div>
-
-        {/* ── "Made with Meckury" label (desktop only) ──── */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="hidden lg:block px-8 text-xs font-semibold uppercase tracking-widest mb-2"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          Made with Meckury
-        </motion.p>
 
         {/* ── Bottom strip ─────────────────────────────── */}
         <motion.div
