@@ -6,9 +6,8 @@ import { ArrowLeft, ChevronDown, Zap, Wand2 } from 'lucide-react'
 import { useGenerate } from '@/hooks/useGenerate'
 import { useAuth } from '@/context/AuthContext'
 import { ImageUpload, MultiImageUpload } from '@/components/ui/ImageUpload'
-import { Button } from '@/components/ui/Button'
 import { Textarea } from '@/components/ui/Input'
-import { Loader, CreditBadge } from '@/components/ui/Modal'
+import { Loader } from '@/components/ui/Modal'
 import { calculateCreditCost } from '@/lib/creditUtils'
 import toast from 'react-hot-toast'
 
@@ -16,7 +15,7 @@ import toast from 'react-hot-toast'
 
 const SettingChips = ({ label, options, value, onChange }) => (
   <div className="mb-4">
-    <p className="text-xs font-semibold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+    <p className="text-xs font-semibold mb-2 uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
       {label}
     </p>
     <div className="flex gap-2 flex-wrap">
@@ -26,9 +25,8 @@ const SettingChips = ({ label, options, value, onChange }) => (
           onClick={() => onChange(opt.value)}
           className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150"
           style={{
-            background: value === opt.value ? 'var(--brand)' : 'var(--bg-elevated)',
-            color:      value === opt.value ? 'white' : 'var(--text-secondary)',
-            fontFamily: 'Syne, sans-serif',
+            background: value === opt.value ? 'var(--text-primary)' : 'var(--bg-elevated)',
+            color:      value === opt.value ? 'var(--text-inverse)' : 'var(--text-secondary)',
           }}
         >
           {opt.label}
@@ -47,8 +45,6 @@ const VIDEO_TYPES = new Set([
 ])
 
 // ─── Generate Page ────────────────────────────────────────
-// IMPORTANT: <Navigate> must be rendered AFTER all hooks.
-// We read location.state first, then run all hooks, then guard at render time.
 
 export default function GeneratePage() {
   const navigate              = useNavigate()
@@ -69,7 +65,6 @@ export default function GeneratePage() {
     creditCostPerImage,
   } = state
 
-  // ── Derived flags ─────────────────────────────────────
   const isTemplate      = type === 'template'
   const isMemoryLane    = templateSlug === 'memory-lane'
   const isHandover      = templateSlug === 'office-handover'
@@ -79,7 +74,6 @@ export default function GeneratePage() {
   const isVideoType     = VIDEO_TYPES.has(type)
   const showModelPicker = isVideoType && !isTemplate
 
-  // ── Form state ────────────────────────────────────────
   const [prompt,       setPrompt]       = useState('')
   const [startFrame,   setStartFrame]   = useState(null)
   const [endFrame,     setEndFrame]     = useState(null)
@@ -89,7 +83,6 @@ export default function GeneratePage() {
   const [model,        setModel]        = useState('kling_2_5')
   const [showSettings, setShowSettings] = useState(false)
 
-  // ── Credit estimation ─────────────────────────────────
   const estimatedCredits = creditCostPerImage
     ? creditCostPerImage * Math.max(imageFrames.length, minImages)
     : calculateCreditCost(
@@ -99,11 +92,8 @@ export default function GeneratePage() {
 
   const canAfford = credits >= parseFloat(estimatedCredits)
 
-  // ── Guard: must be AFTER all hooks ───────────────────
-  // Hooks above always run; Navigate renders conditionally at JSX time.
   if (!type) return <Navigate to="/create" replace />
 
-  // ── Generation handler ────────────────────────────────
   const handleGenerate = async () => {
     if (needsStartFrame && !startFrame)                 return toast.error('Please upload the first image')
     if (needsEndFrame && !endFrame)                     return toast.error('Please upload the second image')
@@ -126,11 +116,11 @@ export default function GeneratePage() {
   }
 
   return (
-    <div className="page-container min-h-dvh" style={{ background: 'var(--bg-primary)' }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
 
       {/* Header */}
       <div
-        className="sticky top-0 z-40 flex items-center justify-between px-4 h-14"
+        className="flex-shrink-0 flex items-center justify-between px-6 h-14"
         style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
       >
         <button
@@ -141,10 +131,16 @@ export default function GeneratePage() {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-base font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--text-primary)' }}>
+        <h1 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
           {isTemplate ? templateName : toolLabel}
         </h1>
-        <CreditBadge credits={credits} size="sm" />
+        <div
+          className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold"
+          style={{ background: 'rgba(249,115,22,0.1)', color: 'var(--brand)' }}
+        >
+          <Zap size={12} fill="currentColor" />
+          {Math.floor(credits)}
+        </div>
       </div>
 
       {/* Loading overlay */}
@@ -176,7 +172,8 @@ export default function GeneratePage() {
         )}
       </AnimatePresence>
 
-      <div className="px-4 py-5 pb-32">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-6 py-5">
 
         {isTemplate && templateDescription && (
           <div
@@ -231,9 +228,7 @@ export default function GeneratePage() {
           className="flex items-center gap-2 w-full py-3 px-4 rounded-2xl mb-2 transition-colors"
           style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)' }}
         >
-          <span className="text-sm font-semibold flex-1 text-left" style={{ fontFamily: 'Syne, sans-serif' }}>
-            Generation settings
-          </span>
+          <span className="text-sm font-semibold flex-1 text-left">Generation settings</span>
           <motion.div animate={{ rotate: showSettings ? 180 : 0 }}>
             <ChevronDown size={18} />
           </motion.div>
@@ -289,30 +284,30 @@ export default function GeneratePage() {
 
       {/* Sticky Generate Button */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 p-4 safe-bottom"
+        className="flex-shrink-0 p-5"
         style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}
       >
-        <div className="max-w-[480px] mx-auto">
-          <Button
-            onClick={handleGenerate}
-            loading={isLoading}
-            disabled={!canAfford}
-            variant="primary"
-            size="lg"
-            fullWidth
-          >
-            <Zap size={18} fill="white" />
-            Generate · {estimatedCredits} credits
-          </Button>
-          {!canAfford && (
-            <p className="text-xs text-center mt-2 text-red-500">
-              Not enough credits.{' '}
-              <button onClick={() => navigate('/profile')} className="underline font-semibold">
-                Top up here
-              </button>
-            </p>
-          )}
-        </div>
+        <button
+          onClick={handleGenerate}
+          disabled={isLoading || !canAfford}
+          className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
+          style={{
+            background: 'var(--text-primary)',
+            color:      'var(--text-inverse)',
+            opacity:    (isLoading || !canAfford) ? 0.6 : 1,
+          }}
+        >
+          <Zap size={16} fill="currentColor" />
+          {isLoading ? 'Generating…' : `Generate · ${estimatedCredits} credits`}
+        </button>
+        {!canAfford && (
+          <p className="text-xs text-center mt-2 text-red-500">
+            Not enough credits.{' '}
+            <button onClick={() => navigate('/profile')} className="underline font-semibold">
+              Top up here
+            </button>
+          </p>
+        )}
       </div>
     </div>
   )
