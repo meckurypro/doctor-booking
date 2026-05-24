@@ -11,14 +11,15 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['DM Sans', ...defaultTheme.fontFamily.sans],
-        display: ['Syne', ...defaultTheme.fontFamily.sans],
+        sans:    ['Inter', ...defaultTheme.fontFamily.sans],
+        display: ['Inter', ...defaultTheme.fontFamily.sans],
         mono:    ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
       },
       colors: {
         brand: {
           DEFAULT: '#f97316',
           dark:    '#ea580c',
+          light:   '#fb923c',
         },
       },
       borderRadius: {
@@ -27,8 +28,8 @@ export default {
         '4xl': '2rem',
       },
       boxShadow: {
-        brand:    '0 4px 24px rgba(249,115,22,0.25)',
-        'brand-lg': '0 8px 40px rgba(249,115,22,0.35)',
+        brand:      '0 4px 20px rgba(249,115,22,0.25)',
+        'brand-lg': '0 8px 36px rgba(249,115,22,0.35)',
       },
       animation: {
         shimmer: 'shimmer 1.5s infinite linear',
