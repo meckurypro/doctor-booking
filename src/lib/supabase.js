@@ -10,9 +10,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    autoRefreshToken:  true,
-    persistSession:    true,
+    autoRefreshToken:   true,
+    persistSession:     true,
     detectSessionInUrl: true,
+    flowType:           'pkce',   // ← Force PKCE; prevents implicit ?hash flow
   },
 })
 
@@ -25,8 +26,8 @@ export const auth = {
     supabase.auth.signInWithOtp({
       email,
       options: {
-        shouldCreateUser:  true,
-        emailRedirectTo:   `${window.location.origin}/auth/callback`,
+        shouldCreateUser: true,
+        emailRedirectTo:  `${window.location.origin}/auth/callback`,
       },
     }),
 
@@ -136,7 +137,7 @@ export const templates = {
 
   toggleVisibility: (adminId, templateId) =>
     supabase.rpc('toggle_template_visibility', {
-      p_admin_id:   adminId,
+      p_admin_id:    adminId,
       p_template_id: templateId,
     }),
 
@@ -174,7 +175,7 @@ export const templatePrompts = {
 
   rollback: (adminId, promptId) =>
     supabase.rpc('rollback_prompt_version', {
-      p_admin_id: adminId,
+      p_admin_id:  adminId,
       p_prompt_id: promptId,
     }),
 }
