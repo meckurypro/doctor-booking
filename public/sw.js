@@ -2,7 +2,7 @@
 // Network-first for HTML (prevents blank screen after Vercel redeploy)
 // Cache-first for static assets (fonts, icons, images)
 
-const CACHE_NAME    = 'meckury-v3'
+const CACHE_NAME    = 'meckury-v4'
 const STATIC_ASSETS = ['/manifest.json']
 
 self.addEventListener('install', (event) => {
@@ -26,7 +26,16 @@ self.addEventListener('fetch', (event) => {
 
   const url = event.request.url
 
-  // Never intercept API or external service calls
+  // ── CRITICAL: never intercept auth flow routes ───────────────
+  // These routes carry ?code= or #access_token query params that
+  // must reach the React app intact. Any SW interference breaks
+  // exchangeCodeForSession and the entire OAuth flow.
+  if (
+    url.includes('/auth/callback') ||
+    url.includes('/auth/reset-password')
+  ) return
+
+  // ── Never intercept API or external service calls ────────────
   if (
     url.includes('/api/')      ||
     url.includes('supabase')   ||
@@ -38,22 +47,15 @@ self.addEventListener('fetch', (event) => {
     url.includes('gstatic')
   ) return
 
-  const isHTML = event.request.headers.get('accept')?.includes('text/html')
+  const isHTML    = event.request.headers.get('accept')?.includes('text/html')
   const isJSorCSS = url.match(/\.(js|css)(\?|$)/)
 
   // ── HTML pages: always network-first ────────────────────────
-  // This is the key fix — stale HTML after redeploy causes blank screen
   if (isHTML) {
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
-          // Don't cache HTML — always get fresh from network
-          return response
-        })
-        .catch(() => {
-          // Offline fallback — serve cached index.html if available
-          return caches.match('/index.html')
-        })
+        .then((response) => response)          // never cache HTML
+        .catch(() => caches.match('/index.html'))  // offline fallback
     )
     return
   }
