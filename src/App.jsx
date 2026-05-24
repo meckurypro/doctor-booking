@@ -36,48 +36,72 @@ const FullLoader = ({ size = 'md' }) => (
 )
 
 // ── OAuth Callback Handler ─────────────────────────────────
-// Declared BEFORE the loading gate so it always mounts and
-// runs immediately when Supabase redirects back with ?code=
+// Handles BOTH flow types:
+//   PKCE flow    → token arrives as ?code=   in search params
+//   Implicit flow → token arrives as #access_token= in hash
+//
+// Supabase's detectSessionInUrl:true handles the implicit flow
+// automatically — we just need to wait for onAuthStateChange
+// to fire SIGNED_IN, then navigate.
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const handle = async () => {
-      const fullUrl = window.location.href
-      const search  = window.location.search
-      const hash    = window.location.hash
-      const hasCode = new URLSearchParams(search).has('code')
+    const search   = window.location.search
+    const hash     = window.location.hash
+    const hasCode  = new URLSearchParams(search).has('code')
+    const hasToken = hash.includes('access_token=')
 
-      console.log('[AuthCallback] full URL   :', fullUrl)
-      console.log('[AuthCallback] search     :', search)
-      console.log('[AuthCallback] hash       :', hash)
-      console.log('[AuthCallback] hasCode    :', hasCode)
+    console.log('[AuthCallback] search  :', search)
+    console.log('[AuthCallback] hash    :', hash ? '[present]' : '[empty]')
+    console.log('[AuthCallback] hasCode :', hasCode)
+    console.log('[AuthCallback] hasToken:', hasToken)
 
-      if (hasCode) {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(fullUrl)
-        console.log('[AuthCallback] exchange data :', data)
-        console.log('[AuthCallback] exchange error:', error)
-
+    if (hasCode) {
+      // PKCE flow — exchange the code for a session manually
+      supabase.auth.exchangeCodeForSession(window.location.href).then(({ error }) => {
         if (error) {
-          console.error('[AuthCallback] exchangeCodeForSession failed', error)
+          console.error('[AuthCallback] exchangeCodeForSession error:', error)
           navigate('/auth?error=oauth_failed', { replace: true })
           return
         }
-
-        // Success — session is established, navigate to /auth.
-        // AuthContext picks up the session via onAuthStateChange
-        // and AuthPage redirects to /feed automatically.
+        console.log('[AuthCallback] PKCE exchange success — navigating to /auth')
         navigate('/auth', { replace: true })
-        return
-      }
-
-      // No code in URL — could be a direct hit or stale redirect
-      console.warn('[AuthCallback] No ?code= param found in URL')
-      navigate('/auth', { replace: true })
+      })
+      return
     }
 
-    handle()
+    if (hasToken) {
+      // Implicit flow — supabase-js detects the hash automatically via
+      // detectSessionInUrl:true and fires onAuthStateChange(SIGNED_IN).
+      // We just need to wait for it, then navigate.
+      console.log('[AuthCallback] Implicit flow — waiting for SIGNED_IN event')
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[AuthCallback] onAuthStateChange event:', event)
+        if (event === 'SIGNED_IN' && session) {
+          subscription.unsubscribe()
+          navigate('/auth', { replace: true })
+        }
+      })
+
+      // Fallback: if onAuthStateChange already fired before we subscribed,
+      // check the session directly
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          console.log('[AuthCallback] Session already present — navigating to /auth')
+          subscription.unsubscribe()
+          navigate('/auth', { replace: true })
+        }
+      })
+
+      return
+    }
+
+    // No token or code — stale / direct hit
+    console.warn('[AuthCallback] No token or code found — redirecting to /auth')
+    navigate('/auth', { replace: true })
   }, [navigate])
 
   return <FullLoader size="lg" />
