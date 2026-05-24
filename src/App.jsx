@@ -1,11 +1,11 @@
 // src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useEffect }    from 'react'
-import { Toaster }      from 'react-hot-toast'
+import { useEffect }  from 'react'
+import { Toaster }    from 'react-hot-toast'
 
-import { supabase }             from '@/lib/supabase'
-import { AuthProvider, useAuth} from '@/context/AuthContext'
-import { ThemeProvider }        from '@/context/ThemeContext'
+import { supabase }              from '@/lib/supabase'
+import { AuthProvider, useAuth } from '@/context/AuthContext'
+import { ThemeProvider }         from '@/context/ThemeContext'
 
 // Pages
 import LandingPage       from '@/pages/LandingPage'
@@ -35,32 +35,24 @@ const FullLoader = ({ size = 'md' }) => (
   </div>
 )
 
-// ── OAuth / Email Callback Handler ─────────────────────────
-//
-// Supabase redirects here after:
-//   • Google OAuth  → URL contains ?code=...
-//   • Email OTP     → URL contains #access_token=... (handled
-//                     automatically by detectSessionInUrl, but
-//                     we still need to route the user away)
-//
-// Strategy: exchange the code, then send the user to /auth.
-// AuthContext will have loaded the session by then and AuthPage
-// will automatically redirect to /feed (or show SET_PROFILE for
-// new Google users who need to complete onboarding).
+// ── OAuth Callback Handler ─────────────────────────────────
+// Must NOT be inside the loading gate — it needs to run
+// immediately when Supabase redirects back with ?code=...
+// If it's blocked by `if (loading) return <FullLoader />`,
+// the code expires before exchangeCodeForSession is called
+// and no user is ever created.
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
     const handle = async () => {
-      const url = window.location.href
-
-      // Only call exchangeCodeForSession when a code is present.
-      // Hash-based sessions (email OTP) are handled by detectSessionInUrl.
       const hasCode = new URLSearchParams(window.location.search).has('code')
 
       if (hasCode) {
-        const { error } = await supabase.auth.exchangeCodeForSession(url)
+        const { error } = await supabase.auth.exchangeCodeForSession(
+          window.location.href,
+        )
         if (error) {
           console.error('AuthCallback: exchangeCodeForSession failed', error)
           navigate('/auth?error=oauth_failed', { replace: true })
@@ -68,8 +60,9 @@ const AuthCallbackPage = () => {
         }
       }
 
-      // Let AuthContext pick up the new session via onAuthStateChange,
-      // then AuthPage decides where to send the user.
+      // Session is now established. Navigate to /auth — AuthContext will
+      // pick up the session via onAuthStateChange and AuthPage will either
+      // redirect to /feed (existing user) or show SET_PROFILE (new user).
       navigate('/auth', { replace: true })
     }
 
@@ -84,12 +77,8 @@ const AuthCallbackPage = () => {
 const ProtectedRoute = ({ children }) => {
   const { user, loading, onboardingNeeded } = useAuth()
 
-  if (loading) return <FullLoader />
-
-  // Not authenticated → login
-  if (!user) return <Navigate to="/auth" replace />
-
-  // Authenticated but profile not set up → complete onboarding
+  if (loading)          return <FullLoader />
+  if (!user)            return <Navigate to="/auth" replace />
   if (onboardingNeeded) return <Navigate to="/auth" replace />
 
   return children
@@ -101,8 +90,8 @@ const AdminRoute = ({ children }) => {
   const { user, isAdmin, loading } = useAuth()
 
   if (loading)  return <FullLoader />
-  if (!user)    return <Navigate to="/auth"  replace />
-  if (!isAdmin) return <Navigate to="/feed"  replace />
+  if (!user)    return <Navigate to="/auth" replace />
+  if (!isAdmin) return <Navigate to="/feed" replace />
 
   return children
 }
@@ -117,82 +106,76 @@ const AppLayout = ({ children }) => (
 )
 
 // ── Route Definitions ──────────────────────────────────────
+// IMPORTANT: /auth/callback and /auth/reset-password are declared
+// BEFORE the loading gate so they always mount and run their
+// useEffect regardless of auth loading state.
 
 const AppRoutes = () => {
   const { user, loading } = useAuth()
 
-  if (loading) return <FullLoader size="lg" />
-
   return (
     <Routes>
 
-      {/* ── Public ─────────────────────────────────────── */}
-      <Route
-        path="/"
-        element={user ? <Navigate to="/feed" replace /> : <LandingPage />}
-      />
-      <Route
-        path="/auth"
-        element={user ? <Navigate to="/feed" replace /> : <AuthPage />}
-      />
-
-      {/* Supabase auth redirects land here */}
+      {/* ── Auth redirects — NEVER blocked by loading ──── */}
       <Route path="/auth/callback"       element={<AuthCallbackPage />} />
       <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
 
-      {/* ── Protected ──────────────────────────────────── */}
-      <Route path="/feed" element={
-        <ProtectedRoute>
-          <AppLayout><FeedPage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/create" element={
-        <ProtectedRoute>
-          <AppLayout><CreatePage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/generate" element={
-        <ProtectedRoute>
-          <AppLayout><GeneratePage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/result/:id" element={
-        <ProtectedRoute>
-          <AppLayout><ResultPage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/history" element={
-        <ProtectedRoute>
-          <AppLayout><HistoryPage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/profile" element={
-        <ProtectedRoute>
-          <AppLayout><ProfilePage /></AppLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/settings" element={
-        <ProtectedRoute>
-          <AppLayout><SettingsPage /></AppLayout>
-        </ProtectedRoute>
-      } />
+      {/* ── Everything else waits for auth to resolve ──── */}
+      {loading ? (
+        <Route path="*" element={<FullLoader size="lg" />} />
+      ) : (
+        <>
+          {/* Public */}
+          <Route
+            path="/"
+            element={user ? <Navigate to="/feed" replace /> : <LandingPage />}
+          />
+          <Route
+            path="/auth"
+            element={user ? <Navigate to="/feed" replace /> : <AuthPage />}
+          />
 
-      {/* ── Admin (no BottomNav) ────────────────────────── */}
-      <Route path="/admin" element={
-        <AdminRoute><AdminPage /></AdminRoute>
-      } />
+          {/* Protected */}
+          <Route path="/feed" element={
+            <ProtectedRoute><AppLayout><FeedPage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/create" element={
+            <ProtectedRoute><AppLayout><CreatePage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/generate" element={
+            <ProtectedRoute><AppLayout><GeneratePage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/result/:id" element={
+            <ProtectedRoute><AppLayout><ResultPage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/history" element={
+            <ProtectedRoute><AppLayout><HistoryPage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute><AppLayout><ProfilePage /></AppLayout></ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute><AppLayout><SettingsPage /></AppLayout></ProtectedRoute>
+          } />
 
-      {/* ── Fallback ────────────────────────────────────── */}
-      <Route
-        path="*"
-        element={<Navigate to={user ? '/feed' : '/'} replace />}
-      />
+          {/* Admin — no AppLayout / no BottomNav */}
+          <Route path="/admin" element={
+            <AdminRoute><AdminPage /></AdminRoute>
+          } />
+
+          {/* Fallback */}
+          <Route
+            path="*"
+            element={<Navigate to={user ? '/feed' : '/'} replace />}
+          />
+        </>
+      )}
 
     </Routes>
   )
 }
 
-// ── Toast styles ───────────────────────────────────────────
+// ── Toast config ───────────────────────────────────────────
 
 const toastOptions = {
   duration: 3000,
@@ -219,7 +202,6 @@ export default function App() {
       <AuthProvider>
         <BrowserRouter>
           <AppRoutes />
-          {/* Toaster inside BrowserRouter so toasts work everywhere */}
           <Toaster position="top-center" toastOptions={toastOptions} />
         </BrowserRouter>
       </AuthProvider>
