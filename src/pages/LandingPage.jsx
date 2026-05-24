@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Zap } from 'lucide-react'
 
-// ── Placeholder video/image reels ─────────────────────────
-// These are example AI-generated video URLs. Replace with your
-// actual Supabase storage URLs once you have real content.
 const REEL_ITEMS = [
   {
     id: 1,
@@ -53,31 +50,28 @@ const ReelCard = ({ item, index }) => (
     transition={{ delay: 0.4 + index * 0.08, duration: 0.5, ease: 'easeOut' }}
     className="relative flex-shrink-0 rounded-2xl overflow-hidden"
     style={{
-      width:  '140px',
-      height: '200px',
+      width: '160px',
+      height: '220px',
       background: `linear-gradient(160deg, ${item.colors[0]}, ${item.colors[1]}, ${item.colors[2]})`,
     }}
   >
-    {/* Shimmer overlay */}
     <div
       className="absolute inset-0"
       style={{
         background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.7) 100%)',
       }}
     />
-    {/* Label */}
     <div className="absolute bottom-0 left-0 right-0 p-3">
-      <p
-        className="text-white text-xs font-semibold leading-tight"
-        style={{ fontFamily: 'Inter, sans-serif', opacity: 0.85 }}
-      >
+      <p className="text-white text-xs font-semibold leading-tight" style={{ opacity: 0.85 }}>
         {item.label}
       </p>
     </div>
-    {/* Play dot */}
-    <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
-      style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }}>
-      <div className="w-0 h-0 ml-0.5"
+    <div
+      className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
+      style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)' }}
+    >
+      <div
+        className="w-0 h-0 ml-0.5"
         style={{
           borderTop: '4px solid transparent',
           borderBottom: '4px solid transparent',
@@ -89,7 +83,6 @@ const ReelCard = ({ item, index }) => (
 )
 
 // ── Landing Page ──────────────────────────────────────────
-
 export default function LandingPage() {
   const navigate = useNavigate()
 
@@ -103,11 +96,11 @@ export default function LandingPage() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5 h-14 max-w-[480px] mx-auto w-full"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 h-14"
         style={{
-          background:          'var(--bg-primary)',
-          borderBottom:        '1px solid var(--border)',
-          backdropFilter:      'blur(12px)',
+          background: 'var(--bg-primary)',
+          borderBottom: '1px solid var(--border)',
+          backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
         }}
       >
@@ -128,126 +121,146 @@ export default function LandingPage() {
           className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
           style={{
             background: 'var(--bg-elevated)',
-            color:      'var(--text-primary)',
+            color: 'var(--text-primary)',
           }}
         >
           Sign in
         </button>
       </motion.header>
 
-      {/* ── Hero ────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col pt-14 max-w-[480px] mx-auto w-full">
+      {/* ── Main ────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col pt-14">
 
-        {/* Headline block */}
-        <div className="px-5 pt-12 pb-8">
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
-            className="text-xs font-semibold uppercase tracking-widest mb-4"
-            style={{ color: 'var(--brand)' }}
-          >
-            AI Content Studio
-          </motion.p>
+        {/* ── Hero ──────────────────────────────────────── */}
+        <div className="w-full max-w-screen-xl mx-auto px-8 pt-20 pb-16 flex flex-col lg:flex-row lg:items-center lg:gap-20">
 
-          <motion.h1
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
-            className="text-4xl font-black leading-none tracking-tight mb-5"
-            style={{ letterSpacing: '-0.04em' }}
-          >
-            Create.
-            <br />
-            <span style={{ color: 'var(--text-muted)' }}>Go viral.</span>
-          </motion.h1>
+          {/* Left: copy + CTAs */}
+          <div className="flex-1 min-w-0">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.15, duration: 0.4 }}
+              className="text-xs font-semibold uppercase tracking-widest mb-5"
+              style={{ color: 'var(--brand)' }}
+            >
+              AI Content Studio
+            </motion.p>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-            className="text-sm leading-relaxed mb-8"
-            style={{ color: 'var(--text-muted)', maxWidth: '280px' }}
-          >
-            Cinematic AI videos and images in seconds.
-            No skills required.
-          </motion.p>
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
+              className="font-black leading-none tracking-tight mb-6"
+              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', letterSpacing: '-0.04em' }}
+            >
+              Create.
+              <br />
+              <span style={{ color: 'var(--text-muted)' }}>Go viral.</span>
+            </motion.h1>
 
-          {/* CTAs */}
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+              className="text-base leading-relaxed mb-10"
+              style={{ color: 'var(--text-muted)', maxWidth: '380px' }}
+            >
+              Cinematic AI videos and images in seconds.
+              No skills required.
+            </motion.p>
+
+            {/* CTAs */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35, duration: 0.4 }}
+              className="flex flex-col sm:flex-row gap-3"
+              style={{ maxWidth: '380px' }}
+            >
+              <button
+                onClick={() => navigate('/auth')}
+                className="flex-1 py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--text-primary)',
+                  color: 'var(--text-inverse)',
+                }}
+              >
+                Get started free →
+              </button>
+
+              <button
+                onClick={() => navigate('/auth')}
+                className="flex-1 py-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
+                style={{
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Sign in
+              </button>
+            </motion.div>
+          </div>
+
+          {/* Right: reel grid (desktop) / hidden on mobile — shown in strip below */}
           <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.4 }}
-            className="flex flex-col gap-3"
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.6, ease: 'easeOut' }}
+            className="hidden lg:grid mt-0"
+            style={{
+              gridTemplateColumns: 'repeat(3, 160px)',
+              gridTemplateRows: 'repeat(2, 220px)',
+              gap: '12px',
+            }}
           >
-            <button
-              onClick={() => navigate('/auth')}
-              className="w-full py-4 rounded-2xl text-sm font-bold tracking-tight transition-all active:scale-[0.98]"
-              style={{
-                background: 'var(--text-primary)',
-                color:      'var(--text-inverse)',
-              }}
-            >
-              Get started free →
-            </button>
-
-            <button
-              onClick={() => navigate('/auth')}
-              className="w-full py-4 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]"
-              style={{
-                background: 'var(--bg-elevated)',
-                color:      'var(--text-secondary)',
-                border:     '1px solid var(--border)',
-              }}
-            >
-              Sign in
-            </button>
-
+            {REEL_ITEMS.map((item, i) => (
+              <ReelCard key={item.id} item={item} index={i} />
+            ))}
           </motion.div>
         </div>
 
-        {/* ── Video reel strip ──────────────────────────── */}
-        <div className="pb-12">
+        {/* ── Video reel strip (mobile only) ────────────── */}
+        <div className="lg:hidden pb-12">
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4, duration: 0.4 }}
-            className="px-5 text-xs font-semibold uppercase tracking-widest mb-4"
+            className="px-8 text-xs font-semibold uppercase tracking-widest mb-4"
             style={{ color: 'var(--text-muted)' }}
           >
             Made with Meckury
           </motion.p>
 
-          {/* Horizontal scroll reel */}
-          <div
-            className="flex gap-3 overflow-x-auto no-scrollbar px-5 pb-2"
-          >
+          <div className="flex gap-3 overflow-x-auto no-scrollbar px-8 pb-2">
             {REEL_ITEMS.map((item, i) => (
               <ReelCard key={item.id} item={item} index={i} />
             ))}
-            {/* End spacer */}
             <div className="flex-shrink-0 w-1" />
           </div>
         </div>
+
+        {/* ── "Made with Meckury" label (desktop only) ──── */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+          className="hidden lg:block px-8 text-xs font-semibold uppercase tracking-widest mb-2"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          Made with Meckury
+        </motion.p>
 
         {/* ── Bottom strip ─────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.9, duration: 0.4 }}
-          className="px-5 pb-8 flex items-center justify-between"
+          className="px-8 pb-8 flex items-center justify-between mt-auto"
           style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}
         >
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            By{' '}
-            <a
-              href="https://linkai.africa"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              LinkAI
-            </a>
+            By LinkAI
           </p>
 
           <div className="flex items-center gap-4">
