@@ -229,8 +229,7 @@ export default function LandingPage() {
             className="px-8 text-xs font-semibold uppercase tracking-widest mb-4"
             style={{ color: 'var(--text-muted)' }}
           >
-            Made with Meckury
-          </motion.p>
+               </motion.p>
 
           <div className="flex gap-3 overflow-x-auto no-scrollbar px-8 pb-2">
             {REEL_ITEMS.map((item, i) => (
